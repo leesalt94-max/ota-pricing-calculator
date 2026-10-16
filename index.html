@@ -157,6 +157,19 @@ h2.sec { margin: 28px 0 10px; font-size: 16px; font-weight: 700; }
 .settings-card .gear-wrap svg { width: 24px; height: 24px; }
 .settings-card > svg { flex: none; width: 20px; height: 20px; color: #B0B8C1; }
 .settings-card .menu-title { font-size: 16px; font-weight: 700; }
+.save-bar {
+  position: sticky; bottom: 0; z-index: 5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+  margin: 20px -20px calc(-24px - env(safe-area-inset-bottom)); padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 75%, rgba(242,244,246,0));
+}
+.save-bar .ghost, .save-bar .primary { height: 56px; border-radius: 16px; font-size: 15px; padding: 0 8px; white-space: nowrap; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20;
+  max-width: calc(100% - 40px); padding: 12px 18px; border-radius: 14px; background: rgba(25,31,40,0.92); color: #FFFFFF;
+  font-size: 14px; font-weight: 600; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
 .text-link {
   align-self: center; border: none; background: none; font-size: 13.5px; font-weight: 500; color: var(--accent);
   padding: 12px; text-decoration: underline; text-underline-offset: 3px;
@@ -366,8 +379,20 @@ details.why[open] summary::before { content: "▾ "; }
       return out;
     } catch (e) { return d; }
   }
-  function save() {
+  function persist() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  // 설정 화면에서는 바로 저장하지 않고 '이대로 저장'을 눌러야 저장
+  var SETTINGS_KEYS = ["channels", "costs", "avgLOS", "roundUnit", "cleaning"];
+  var settingsSnap = null, settingsDirty = false;
+  function pickSettings(obj) {
+    var o = {};
+    SETTINGS_KEYS.forEach(function (k) { o[k] = obj[k]; });
+    return JSON.parse(JSON.stringify(o));
+  }
+  function save() {
+    if ((location.hash || "").replace("#", "") === "settings") { settingsDirty = true; return; }
+    persist();
   }
   var state = load();
 
@@ -910,7 +935,7 @@ details.why[open] summary::before { content: "▾ "; }
     }).join("");
     return header({ back: settingsReturn === "settings" ? "result" : settingsReturn, backLabel: "돌아가기" }) +
       '<h1 style="margin-top:8px">설정</h1>' +
-      '<p class="lead">바꾼 값은 이 기기에 자동 저장돼요.</p>' +
+      '<p class="lead">값을 고친 뒤 아래 \'이대로 저장\'을 눌러야 적용돼요. 저장하지 않고 나가면 바뀐 내용은 취소돼요.</p>' +
       cards +
       costCard() +
       '<div class="card mt-s"><div class="row-between"><label for="round-unit" style="font-size:14px">가격 반올림 단위</label>' +
@@ -918,7 +943,9 @@ details.why[open] summary::before { content: "▾ "; }
         return '<option value="' + u + '"' + (state.roundUnit === u ? " selected" : "") + '>' + comma(u) + '원</option>';
       }).join("") + '</select></div></div>' +
       '<p class="note">에어비앤비·부킹닷컴은 할인을 차례로 곱해서, 트립닷컴은 할인율을 더해서 적용해요. 부킹닷컴·트립닷컴 계약에 레이트 패리티(최저가 보장) 조항이 있는지도 확인하세요.</p>' +
-      '<div class="spacer"></div><button type="button" class="ghost" data-reset>기본값으로 되돌리기</button>';
+      '<div class="spacer"></div>' +
+      '<div class="save-bar"><button type="button" class="ghost" data-reset>기본값으로 되돌리기</button>' +
+      '<button type="button" class="primary" data-save-settings>이대로 저장</button></div>';
   }
   function whtDesc(ci) {
     var info = costInfo(ci);
@@ -961,9 +988,24 @@ details.why[open] summary::before { content: "▾ "; }
 
   /* ---------- 렌더 ---------- */
   var app = document.getElementById("app");
+  var toastEl = document.createElement("div");
+  toastEl.className = "toast"; toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite");
+  document.body.appendChild(toastEl);
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg; toastEl.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2400);
+  }
   function set(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+  var lastView = "";
   function render() {
     var v = current();
+    if (v === "settings" && lastView !== "settings") { settingsSnap = pickSettings(state); settingsDirty = false; }
+    if (lastView === "settings" && v !== "settings" && settingsDirty && settingsSnap) {
+      Object.assign(state, settingsSnap); settingsDirty = false;
+      toast("저장하지 않은 설정 변경은 취소했어요");
+    }
+    lastView = v;
     var html = {
       start: viewStart, input: viewInput, result: viewResult, breakdown: viewBreakdown,
       extra: viewExtra, cleaning: viewCleaning, money: viewMoney, settings: viewSettings
@@ -1050,7 +1092,15 @@ details.why[open] summary::before { content: "▾ "; }
       return;
     }
     if (d.reset !== undefined) {
-      state = defaults(); save(); render(); return;
+      Object.assign(state, pickSettings(defaults())); settingsDirty = true; render();
+      toast("기본값을 불러왔어요. '이대로 저장'을 눌러야 적용돼요");
+      return;
+    }
+    if (d.saveSettings !== undefined) {
+      persist(); settingsDirty = false; settingsSnap = pickSettings(state);
+      toast("설정을 저장했어요");
+      go(settingsReturn === "settings" ? "start" : settingsReturn);
+      return;
     }
   });
 
