@@ -13,6 +13,7 @@ const state = {
       { name: "회원할인", rate: 15 },
     ] },
   },
+  extraGuest: { base: 4, max: 8, airbnbFee: 17219 },
   taxBasis: "airbnb",
   tax: { expenseMethod: "simple" },
 };
@@ -60,6 +61,23 @@ function calcPlatform(platform, target) {
     const guestPays = finalList * df;
     const actualNet = guestPays * (1 - commission);
     out[day] = { net, finalList, guestPays, actualNet, totalDiscountPct: (1 - df) * 100 };
+  }
+  return out;
+}
+
+// 인원 추가 요금: 에어비앤비 1인당 추가요금에서 실제 순수익(가중치 제외분)을 구하고,
+// 각 채널에서 같은 순수익이 남도록 수수료·할인·가중치를 반영해 1인당 추가요금을 역산.
+// 프로모션 할인이 추가 인원 요금에도 똑같이 적용된다고 가정.
+function calcExtraGuest() {
+  const ab = state.platforms.airbnb;
+  const abFactor = (1 - ab.commission / 100) * discountFactor(ab.promos, ab.stack);
+  const baseNet = (state.extraGuest.airbnbFee * abFactor) / (1 + ab.weight / 100);
+  const out = {};
+  for (const [key, p] of Object.entries(state.platforms)) {
+    const df = discountFactor(p.promos, p.stack);
+    const factor = (1 - p.commission / 100) * df;
+    const fee = key === "airbnb" ? state.extraGuest.airbnbFee : (baseNet / factor) * (1 + p.weight / 100);
+    out[key] = { fee, guestPays: fee * df, actualNet: fee * factor };
   }
   return out;
 }
@@ -230,6 +248,8 @@ function renderResults() {
     })
     .join("");
 
+  renderExtraGuest(result);
+
   // tax
   const t = result.tax;
   const pill = document.getElementById("tax-type-pill");
@@ -257,9 +277,41 @@ function renderResults() {
   document.getElementById("tax-note").textContent = `${t.note}. 경비율은 국세청 업종코드 551007(공유숙박업) 2023년 귀속 고시 기준으로, 매년 갱신되니 최신 고시를 확인하세요. 다른 종합소득 합산, 세액공제 등에 따라 실제 세액은 달라질 수 있습니다.`;
 }
 
+function renderExtraGuest(result) {
+  const extra = calcExtraGuest();
+  const { base, max } = state.extraGuest;
+
+  document.getElementById("extra-fee-body").innerHTML = Object.entries(state.platforms)
+    .map(([key, p]) => {
+      const e = extra[key];
+      return `
+        <tr>
+          <td><div class="row-channel"><span class="chip ${p.cls}">${p.code}</span>${p.label}</div></td>
+          <td data-label="1인당 추가요금" class="price-highlight">${won(e.fee)}</td>
+          <td data-label="게스트 결제가">${won(e.guestPays)}</td>
+          <td data-label="실제 순수익">${won(e.actualNet)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  let rows = "";
+  for (let n = base; n <= Math.max(base, max); n++) {
+    const add = n - base;
+    rows += `<tr><td><b>${n}명</b>${add ? ` <span class="daytag">+${add}명</span>` : ` <span class="daytag">기준</span>`}</td>`;
+    for (const [key, p] of Object.entries(result.perPlatform)) {
+      const wd = roundPrice(p.calc.weekday.finalList + extra[key].fee * add);
+      const we = roundPrice(p.calc.weekend.finalList + extra[key].fee * add);
+      rows += `<td data-label="${p.label}"><div class="dual-price"><span><em>평일</em>${won(wd)}</span><span><em>주말</em>${won(we)}</span></div></td>`;
+    }
+    rows += `</tr>`;
+  }
+  document.getElementById("occupancy-body").innerHTML = rows;
+}
+
 function bindBase() {
   [["target-weekday", "target", "weekday"], ["target-weekend", "target", "weekend"],
-   ["nights-weekday", "nights", "weekday"], ["nights-weekend", "nights", "weekend"]].forEach(([id, a, b]) => {
+   ["nights-weekday", "nights", "weekday"], ["nights-weekend", "nights", "weekend"],
+   ["extra-base", "extraGuest", "base"], ["extra-max", "extraGuest", "max"], ["extra-airbnb-fee", "extraGuest", "airbnbFee"]].forEach(([id, a, b]) => {
     document.getElementById(id).addEventListener("input", (e) => {
       if (b) state[a][b] = parseFloat(e.target.value) || 0;
       else state[a] = parseFloat(e.target.value) || 0;

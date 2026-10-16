@@ -87,6 +87,48 @@
       <section>
         <div class="section-label">
           <span class="index">03</span>
+          <h2>인원 추가 요금</h2>
+          <span class="hint">에어비앤비 1인당 추가요금과 1인당 실제 순수익이 같아지도록 부킹·트립 추가요금을 역산 (가중치 반영)</span>
+        </div>
+        <div class="table-card">
+          <div class="tax-controls">
+            <div class="field">
+              <label>기준 인원</label>
+              <div class="unit-input"><input type="number" id="extra-base" value="4" step="1" min="1"><span class="unit">명</span></div>
+            </div>
+            <div class="field">
+              <label>최대 인원</label>
+              <div class="unit-input"><input type="number" id="extra-max" value="8" step="1" min="1"><span class="unit">명</span></div>
+            </div>
+            <div class="field">
+              <label>에어비앤비 1인당 추가요금</label>
+              <div class="unit-input"><input type="number" id="extra-airbnb-fee" value="17219" step="100"><span class="unit">원</span></div>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>채널</th><th>1인당 추가요금</th><th>게스트 결제가</th><th>실제 순수익</th></tr>
+              </thead>
+              <tbody id="extra-fee-body"></tbody>
+            </table>
+          </div>
+          <div class="sub-head">인원별 게시가 (기준 게시가 + 추가요금)</div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>인원</th><th>에어비앤비</th><th>부킹닷컴</th><th>트립닷컴</th></tr>
+              </thead>
+              <tbody id="occupancy-body"></tbody>
+            </table>
+          </div>
+          <p class="note">각 채널의 프로모션 할인이 추가 인원 요금에도 똑같이 적용된다고 가정했습니다. 부킹닷컴은 인원별 요금(Occupancy-based pricing)에, 트립닷컴은 추가 인원 요금 설정에 위 1인당 추가요금을 입력하세요.</p>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">
+          <span class="index">04</span>
           <h2>세금 추정</h2>
           <span class="hint">한국 개인사업자 · 종합소득세 + 부가가치세 기준 단순 추정</span>
         </div>
