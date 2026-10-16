@@ -2,13 +2,13 @@ const state = {
   target: { weekday: 110000, weekend: 140000 },
   nights: { weekday: 16, weekend: 8 },
   platforms: {
-    airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, weight: 0, promos: [{ name: "조기예약 할인", rate: 5 }] },
-    booking: { label: "부킹닷컴",   code: "BK", cls: "bk", commission: 17.5, weight: 5, promos: [
+    airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, weight: 0, stack: "multiply", promos: [{ name: "조기예약 할인", rate: 5 }] },
+    booking: { label: "부킹닷컴",   code: "BK", cls: "bk", commission: 17.5, weight: 5, stack: "multiply", promos: [
       { name: "베이직 할인", rate: 50 },
       { name: "모바일 할인", rate: 10 },
       { name: "지니어스 할인", rate: 10 },
     ] },
-    trip:    { label: "트립닷컴",   code: "TR", cls: "tr", commission: 15.5, weight: 8, promos: [
+    trip:    { label: "트립닷컴",   code: "TR", cls: "tr", commission: 15.5, weight: 8, stack: "add", promos: [
       { name: "모바일 할인", rate: 10 },
       { name: "회원할인", rate: 15 },
     ] },
@@ -38,13 +38,19 @@ const won = (n) => Math.round(n).toLocaleString("ko-KR") + "원";
 const pct = (n) => (Math.round(n * 10) / 10).toLocaleString("ko-KR") + "%";
 const roundPrice = (n) => Math.round(n / 100) * 100;
 
-function discountFactor(promos) {
+// stack: "multiply" = 곱연산(복리) — 할인이 차례로 적용됨 (예: 10% + 15% → 23.5%)
+//        "add"      = 합산 — 할인율을 더해서 한 번에 적용 (예: 10% + 15% → 25%), 트립닷컴 방식
+function discountFactor(promos, stack = "multiply") {
+  if (stack === "add") {
+    const sum = promos.reduce((acc, p) => acc + (p.rate || 0), 0);
+    return Math.max(0.01, 1 - sum / 100); // 합산 할인이 100% 이상이면 계산 불가하므로 하한 1%
+  }
   return promos.reduce((acc, p) => acc * (1 - (p.rate || 0) / 100), 1);
 }
 
 function calcPlatform(platform, target) {
   const commission = platform.commission / 100;
-  const df = discountFactor(platform.promos);
+  const df = discountFactor(platform.promos, platform.stack);
   const weight = platform.weight / 100;
   const out = {};
   for (const day of ["weekday", "weekend"]) {
