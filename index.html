@@ -2,178 +2,924 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>채널별 레이트 데스크</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#F2F4F6">
+<title>레이트 데스크</title>
+<style>
+:root {
+  --bg: #F2F4F6;
+  --card: #FFFFFF;
+  --ink: #191F28;
+  --sub: #4E5968;
+  --faint: #6B7684;
+  --line: #E5E8EB;
+  --line2: #F2F4F6;
+  --accent: #0E6B5C;
+  --accent-ink: #0A5246;
+  --accent-soft: #E3F1EE;
+  --gold-bg: #FBF6EC;
+  --gold-line: #EAD9B8;
+  --gold-ink: #6B4708;
+  --gold-chip: #FBEFD9;
+  --warn-bg: #FDF0EC;
+  --warn-ink: #9A3B26;
+  --chip-ab: #F3AFAF; --chip-ab-ink: #7A2020;
+  --chip-bk: #14315C; --chip-bk-ink: #FFFFFF;
+  --chip-tr: #A9D8ED; --chip-tr-ink: #133F52;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+button, input, select { font-family: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+/* header */
+.top { display: flex; align-items: center; justify-content: space-between; height: 56px; flex: none; }
+.brand { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.back {
+  display: inline-flex; align-items: center; gap: 4px; height: 44px; margin-left: -10px; padding: 0 10px;
+  border: none; background: none; font-size: 14.5px; font-weight: 600; color: var(--ink); border-radius: 10px;
+}
+.back svg { width: 20px; height: 20px; }
+.progress { display: flex; gap: 6px; }
+.progress span { width: 28px; height: 4px; border-radius: 2px; background: #D5DAE1; }
+.progress span.on { background: var(--accent); }
+.icon-link {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-right: -10px;
+  border: none; background: none; border-radius: 10px; color: var(--sub);
+}
+.icon-link svg { width: 22px; height: 22px; }
+
+/* type */
+.step-no { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
+h1 { margin: 0; font-size: 24px; line-height: 1.35; font-weight: 700; letter-spacing: -0.02em; }
+.lead { margin: 8px 0 0; font-size: 14px; color: var(--sub); }
+h2.sec { margin: 28px 0 10px; font-size: 16px; font-weight: 700; }
+.small { font-size: 12.5px; color: var(--sub); }
+.note { margin: 12px 2px 0; font-size: 12px; line-height: 1.65; color: var(--faint); }
+
+/* cards */
+.card { background: var(--card); border-radius: 18px; padding: 18px; }
+.card + .card { margin-top: 12px; }
+.mt { margin-top: 20px; }
+.mt-s { margin-top: 12px; }
+
+/* choice */
+.choices { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
+.choice {
+  text-align: left; background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 20px;
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.choice[aria-pressed="true"] { border-color: var(--accent); }
+.radio { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #B0B8C1; margin-top: 2px; }
+.choice[aria-pressed="true"] .radio { border: 7px solid var(--accent); }
+.choice-title { display: block; font-size: 17px; font-weight: 700; }
+.choice-desc { display: block; margin-top: 6px; font-size: 13.5px; line-height: 1.55; color: var(--sub); }
+
+/* big input */
+.big-label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+.big-field { display: flex; align-items: baseline; gap: 6px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+.big-field input {
+  border: none; outline: none; background: none; font-size: 34px; font-weight: 700; width: 100%; min-width: 0; padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+.big-field span { font-size: 20px; font-weight: 600; }
+.kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; margin-top: 8px; }
+.kv > span:first-child { color: var(--sub); }
+.kv.strong > span:last-child { font-weight: 700; color: var(--accent); }
+
+/* segmented */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; background: #E5E8EB; border-radius: 12px; padding: 4px; }
+.card .seg { background: var(--bg); }
+.seg button {
+  height: 40px; border: none; border-radius: 9px; background: none; font-size: 13.5px; font-weight: 500; color: var(--sub);
+  white-space: nowrap; padding: 0 6px;
+}
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--ink); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+/* stepper */
+.stepper { display: flex; align-items: center; gap: 8px; }
+.stepper button {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 20px; line-height: 1;
+}
+.stepper input {
+  width: 64px; text-align: center; border: none; background: none; font-size: 18px; font-weight: 700; padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+.stepper .val { min-width: 64px; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* field */
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--sub); }
+.box-input { display: flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; height: 44px; background: var(--card); }
+.box-input input { width: 100%; min-width: 0; border: none; background: none; font-size: 15px; font-weight: 600; color: var(--ink); padding: 0; outline: none; font-variant-numeric: tabular-nums; }
+.box-input:focus-within { border-color: var(--accent); }
+.box-input span { color: var(--ink); font-size: 14px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+/* primary */
+.spacer { flex-grow: 1; min-height: 24px; }
+.primary {
+  display: flex; align-items: center; justify-content: center; width: 100%; height: 56px; border-radius: 16px; border: none;
+  background: var(--accent); color: #FFFFFF; font-size: 17px; font-weight: 700;
+}
+.primary:active { background: var(--accent-ink); }
+.text-link {
+  align-self: center; border: none; background: none; font-size: 13.5px; font-weight: 500; color: var(--accent);
+  padding: 12px; text-decoration: underline; text-underline-offset: 3px;
+}
+.text-link.muted { color: var(--sub); }
+
+/* channel list */
+.chip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+}
+.chip.sm { width: 28px; height: 28px; border-radius: 8px; font-size: 11px; }
+.chip.ab { background: var(--chip-ab); color: var(--chip-ab-ink); }
+.chip.bk { background: var(--chip-bk); color: var(--chip-bk-ink); }
+.chip.tr { background: var(--chip-tr); color: var(--chip-tr-ink); }
+.list { background: var(--card); border-radius: 18px; overflow: hidden; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 16px 18px; }
+.list-row + .list-row { border-top: 1px solid var(--line2); }
+.grow { flex-grow: 1; min-width: 0; }
+.ch-name { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ch-price { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag { font-size: 11.5px; font-weight: 600; color: var(--sub); background: var(--line2); border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+.tag.gold { color: #8A5A0B; background: var(--gold-chip); }
+.tag.green { color: var(--accent-ink); background: var(--accent-soft); }
+.tag.warn { color: var(--warn-ink); background: var(--warn-bg); }
+
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.tile { background: var(--accent-soft); border-radius: 16px; padding: 14px 16px; color: var(--accent-ink); }
+.tile .t-label { font-size: 12.5px; }
+.tile .t-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* menu */
+.menu-row {
+  display: flex; align-items: center; gap: 12px; padding: 16px 18px; width: 100%; border: none; background: none; text-align: left;
+}
+.menu-row + .menu-row { border-top: 1px solid var(--line2); }
+.menu-row:active { background: var(--line2); }
+.menu-title { font-size: 15px; font-weight: 600; }
+.menu-desc { font-size: 12.5px; color: var(--sub); }
+.menu-row svg { flex: none; width: 18px; height: 18px; color: #B0B8C1; }
+
+/* ledger lines */
+.line { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 14px; border-bottom: 1px dashed var(--line); }
+.line:last-child { border-bottom: none; }
+.line > span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.line.minus > span:last-child { color: var(--sub); }
+.line.total { border-top: 1.5px solid var(--ink); border-bottom: none; margin-top: 4px; padding-top: 14px; font-weight: 700; align-items: baseline; }
+.line.total > span:last-child { font-size: 22px; color: var(--accent); }
+.line.sub > span { font-size: 13px; color: var(--sub); }
+.big-figure { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+/* breakdown flow */
+.flow-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.flow-head .grow { font-size: 15.5px; font-weight: 700; }
+
+/* table */
+.tbl-wrap { overflow-x: auto; margin: 0 -4px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th { font-size: 12px; font-weight: 600; color: var(--sub); text-align: right; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 10px 6px; text-align: right; border-bottom: 1px solid var(--line2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td .tag { margin-left: 4px; }
+
+/* settings */
+.ch-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ch-head .grow { font-size: 15.5px; font-weight: 700; }
+.weight-box { margin-top: 14px; background: var(--gold-bg); border-radius: 12px; padding: 12px 14px; }
+.weight-box .w-label { font-size: 14px; font-weight: 700; color: var(--gold-ink); }
+.weight-box .stepper button { width: 40px; height: 40px; border-radius: 10px; border-color: var(--gold-line); font-size: 18px; }
+.weight-box .val { min-width: 54px; font-size: 17px; color: var(--gold-ink); }
+.weight-box p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: #7A5A1E; }
+.promo-title { margin: 16px 0 4px; font-size: 12.5px; font-weight: 600; color: var(--sub); }
+.promo-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.promo-row .name { flex: 1 1 auto; min-width: 0; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 14px; background: var(--card); }
+.promo-row .rate { flex: none; width: 70px; height: 42px; padding: 0 8px; }
+.promo-row .rate input { text-align: right; font-size: 14px; }
+.promo-row.off .name, .promo-row.off .rate { opacity: 0.5; }
+.switch { flex: none; width: 46px; height: 28px; border-radius: 14px; border: none; background: #D5DAE1; position: relative; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; transition: left .15s; }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { left: 21px; }
+.del { flex: none; width: 32px; height: 42px; border: none; background: none; color: #8B95A1; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.del svg { width: 18px; height: 18px; }
+.add-btn {
+  width: 100%; height: 44px; margin-top: 6px; border: 1.5px dashed #C9D1D9; border-radius: 10px; background: none;
+  font-size: 13.5px; font-weight: 600; color: var(--accent);
+}
+.ghost {
+  width: 100%; height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); font-size: 14px; font-weight: 600; color: var(--sub);
+}
+.check { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; font-size: 14px; }
+select.box-select { height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 14px; font-weight: 600; background: var(--card); }
+
+details.why { margin-top: 12px; }
+details.why summary { cursor: pointer; font-size: 13px; color: var(--sub); list-style: none; padding: 6px 0; }
+details.why summary::-webkit-details-marker { display: none; }
+details.why summary::before { content: "▸ "; }
+details.why[open] summary::before { content: "▾ "; }
+
+@media (min-width: 720px) {
+  body { padding-top: 24px; }
+  .app { min-height: auto; }
+}
+</style>
 </head>
 <body>
+<div class="app" id="app"></div>
 
-<div class="shell">
-  <div class="masthead">
-    <div>
-      <div class="eyebrow">Rate Desk</div>
-      <h1>채널별 레이트 데스크</h1>
-      <p>목표 순수익을 입력하면 에어비앤비 · 부킹닷컴 · 트립닷컴에 걸 게시가를 역산합니다.</p>
-    </div>
-  </div>
+<script>
+(function () {
+  "use strict";
 
-  <div class="layout">
-    <!-- LEFT RAIL: INPUTS -->
-    <div class="rail">
-      <div class="panel">
-        <h2>목표 순수익 &amp; 판매량</h2>
-        <p class="desc">수수료·할인을 모두 뗀 뒤 실제 손에 들어오는 1박당 금액 기준입니다.</p>
-        <div class="field-row">
-          <div class="field">
-            <label>평일 목표 순수익</label>
-            <div class="unit-input"><input type="number" id="target-weekday" value="110000" step="1000"><span class="unit">원</span></div>
-          </div>
-          <div class="field">
-            <label>주말 목표 순수익</label>
-            <div class="unit-input"><input type="number" id="target-weekend" value="140000" step="1000"><span class="unit">원</span></div>
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>월 평일 판매 박수</label>
-            <div class="unit-input"><input type="number" id="nights-weekday" value="16" step="1"><span class="unit">박</span></div>
-          </div>
-          <div class="field">
-            <label>월 주말 판매 박수</label>
-            <div class="unit-input"><input type="number" id="nights-weekend" value="8" step="1"><span class="unit">박</span></div>
-          </div>
-        </div>
-      </div>
+  /* ---------- 상수 ---------- */
+  // 국세청 업종코드 551007(공유숙박업) 2023년 귀속 고시 경비율 — 매년 갱신되니 최신 고시 확인 필요
+  var EXPENSE_RATIOS = { simple: 84.6, standard: 17.3 };
+  var SIMPLE_RATIO_LIMIT = 36000000;       // 숙박업 단순경비율 적용 기준: 직전연도 수입금액 3,600만원 미만
+  var SIMPLIFIED_VAT_THRESHOLD = 104000000; // 간이과세자 기준: 연 공급대가 1억 4백만원 미만
+  var VAT_EXEMPT_THRESHOLD = 48000000;      // 간이과세자 납부면제: 연 공급대가 4,800만원 미만
+  var SIMPLIFIED_VALUE_ADDED_RATE = 0.25;   // 간이과세 숙박업 부가가치율 25%
+  var TAX_BRACKETS = [
+    { limit: 14000000, rate: 0.06, deduction: 0 },
+    { limit: 50000000, rate: 0.15, deduction: 1260000 },
+    { limit: 88000000, rate: 0.24, deduction: 5760000 },
+    { limit: 150000000, rate: 0.35, deduction: 15440000 },
+    { limit: 300000000, rate: 0.38, deduction: 19940000 },
+    { limit: 500000000, rate: 0.40, deduction: 25940000 },
+    { limit: 1000000000, rate: 0.42, deduction: 35940000 },
+    { limit: Infinity, rate: 0.45, deduction: 65940000 }
+  ];
+  var STORE_KEY = "rate-desk-v2";
+  var CH_KEYS = ["airbnb", "booking", "trip"];
+  var DAY_LABEL = { weekday: "평일", weekend: "주말" };
 
-      <div class="panel">
-        <h2>플랫폼 설정</h2>
-        <p class="desc">가중치를 올리면 그 채널만 게시가가 더 비싸집니다 — 에어비앤비를 주력으로 쓰고 싶을 때 부킹·트립 쪽을 올리세요.</p>
-        <div id="platform-cards"></div>
-      </div>
-    </div>
+  function defaults() {
+    return {
+      mode: "price",            // price: 에어비앤비 가격부터 / net: 순수익부터
+      priceInput: 137000,
+      netInput: 110000,
+      weekendMode: "pct",       // pct | direct
+      weekendPct: 27,
+      weekendDirectPrice: 174000,
+      weekendDirectNet: 140000,
+      day: "weekday",
+      roundUnit: 100,
+      channels: {
+        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply",
+                   promos: [{ name: "조기예약 할인", rate: 5, on: true }] },
+        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply",
+                   promos: [{ name: "베이직 할인", rate: 50, on: true }, { name: "모바일 할인", rate: 10, on: true }, { name: "지니어스 할인", rate: 10, on: true }] },
+        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15.5, processing: 0, weight: 8, stack: "add",
+                   promos: [{ name: "모바일 할인", rate: 10, on: true }, { name: "회원 할인", rate: 15, on: true }] }
+      },
+      extra: { base: 4, max: 8, airbnbFee: 17219 },
+      cleaning: { on: false, airbnbFee: 30000, applyPromo: false, avgLOS: 2 },
+      nights: { weekday: 16, weekend: 8 },
+      basis: "airbnb"
+    };
+  }
 
-    <!-- RIGHT: OUTPUT -->
-    <div class="output">
-      <section>
-        <div class="section-label">
-          <span class="index">01</span>
-          <h2>채널별 가격표</h2>
-          <span class="hint">프로모션은 에어비앤비·부킹닷컴은 곱연산, 트립닷컴은 합산으로 적용됩니다</span>
-        </div>
-        <div class="table-card">
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr><th>채널</th><th>게시가</th><th>게스트 결제가</th><th>실제 순수익</th></tr>
-              </thead>
-              <tbody id="price-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+  /* ---------- 저장 ---------- */
+  function load() {
+    var d = defaults();
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return d;
+      var s = JSON.parse(raw);
+      // 얕은 병합 + 채널 병합 (새 필드가 생겨도 깨지지 않게)
+      var out = Object.assign(d, s);
+      out.channels = defaults().channels;
+      CH_KEYS.forEach(function (k) {
+        if (s.channels && s.channels[k]) {
+          var c = s.channels[k];
+          ["commission", "processing", "weight"].forEach(function (f) { if (typeof c[f] === "number") out.channels[k][f] = c[f]; });
+          if (Array.isArray(c.promos)) out.channels[k].promos = c.promos;
+        }
+      });
+      out.extra = Object.assign(defaults().extra, s.extra || {});
+      out.cleaning = Object.assign(defaults().cleaning, s.cleaning || {});
+      out.nights = Object.assign(defaults().nights, s.nights || {});
+      return out;
+    } catch (e) { return d; }
+  }
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  var state = load();
 
-      <section>
-        <div class="section-label">
-          <span class="index">02</span>
-          <h2>채널별 월간 · 연간 순수익</h2>
-          <span class="hint">동일한 월 판매 박수를 그 채널 하나로 전부 채웠다고 가정했을 때</span>
-        </div>
-        <div class="table-card">
-          <div class="compare-grid" id="compare-grid"></div>
-        </div>
-      </section>
+  /* ---------- 포맷 ---------- */
+  function won(n) { return isFinite(n) ? Math.round(n).toLocaleString("ko-KR") + "원" : "—"; }
+  function comma(n) { return isFinite(n) ? Math.round(n).toLocaleString("ko-KR") : ""; }
+  function pct(n) { return (Math.round(n * 10) / 10).toLocaleString("ko-KR") + "%"; }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+  }
+  function parseNum(v) {
+    var n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+    return isFinite(n) ? n : 0;
+  }
+  function roundTo(v) {
+    var u = state.roundUnit || 1;
+    return isFinite(v) ? Math.round(v / u) * u : v;
+  }
 
-      <section>
-        <div class="section-label">
-          <span class="index">03</span>
-          <h2>인원 추가 요금</h2>
-          <span class="hint">에어비앤비 1인당 추가요금과 1인당 실제 순수익이 같아지도록 부킹·트립 추가요금을 역산 (가중치 반영)</span>
-        </div>
-        <div class="table-card">
-          <div class="tax-controls">
-            <div class="field">
-              <label>기준 인원</label>
-              <div class="unit-input"><input type="number" id="extra-base" value="4" step="1" min="1"><span class="unit">명</span></div>
-            </div>
-            <div class="field">
-              <label>최대 인원</label>
-              <div class="unit-input"><input type="number" id="extra-max" value="8" step="1" min="1"><span class="unit">명</span></div>
-            </div>
-            <div class="field">
-              <label>에어비앤비 1인당 추가요금</label>
-              <div class="unit-input"><input type="number" id="extra-airbnb-fee" value="17219" step="100"><span class="unit">원</span></div>
-            </div>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr><th>채널</th><th>1인당 추가요금</th><th>게스트 결제가</th><th>실제 순수익</th></tr>
-              </thead>
-              <tbody id="extra-fee-body"></tbody>
-            </table>
-          </div>
-          <div class="sub-head">인원별 게시가 (기준 게시가 + 추가요금)</div>
-          <div class="table-scroll">
-            <table>
-              <thead>
-                <tr><th>인원</th><th>에어비앤비</th><th>부킹닷컴</th><th>트립닷컴</th></tr>
-              </thead>
-              <tbody id="occupancy-body"></tbody>
-            </table>
-          </div>
-          <p class="note">각 채널의 프로모션 할인이 추가 인원 요금에도 똑같이 적용된다고 가정했습니다. 부킹닷컴은 인원별 요금(Occupancy-based pricing)에, 트립닷컴은 추가 인원 요금 설정에 위 1인당 추가요금을 입력하세요.</p>
-        </div>
-      </section>
+  /* ---------- 계산 ---------- */
+  function effComm(ch) { return (ch.commission || 0) + (ch.processing || 0); }
 
-      <section>
-        <div class="section-label">
-          <span class="index">04</span>
-          <h2>세금 추정</h2>
-          <span class="hint">한국 개인사업자 · 종합소득세 + 부가가치세 기준 단순 추정</span>
-        </div>
-        <div class="table-card">
-          <div class="tax-controls">
-            <div class="field">
-              <label>기준 채널</label>
-              <div class="segmented" id="tax-basis-toggle">
-                <button data-basis="airbnb" aria-pressed="true">에어비앤비</button>
-                <button data-basis="booking" aria-pressed="false">부킹닷컴</button>
-                <button data-basis="trip" aria-pressed="false">트립닷컴</button>
-              </div>
-            </div>
-            <div class="field">
-              <label>과세유형 (자동 판정)</label>
-              <span class="status-pill" id="tax-type-pill"><span class="dot"></span><span id="tax-type-label"></span></span>
-            </div>
-            <div class="field">
-              <label>경비율 방식</label>
-              <div class="segmented" id="expense-method-toggle">
-                <button data-method="simple" aria-pressed="true">단순경비율 84.6%</button>
-                <button data-method="standard" aria-pressed="false">기준경비율 17.3%</button>
-              </div>
-            </div>
-          </div>
-          <div class="tax-body" id="tax-body"></div>
-          <div class="tax-headline">
-            <span class="label">세후 예상 실수령액 (연간)</span>
-            <span class="figure" id="tax-final"></span>
-          </div>
-          <details class="detail-toggle">
-            <summary>매출·공급가액 계산 근거 보기</summary>
-            <div class="detail-toggle-body" id="tax-detail"></div>
-          </details>
-          <p class="note" id="tax-note"></p>
-        </div>
-      </section>
+  // 프로모션 결합: multiply = 차례로 적용(곱연산), add = 할인율을 더해 한 번에 적용(합산, 트립닷컴)
+  function discountFactor(ch) {
+    var on = ch.promos.filter(function (p) { return p.on; });
+    if (ch.stack === "add") {
+      var sum = on.reduce(function (a, p) { return a + (p.rate || 0); }, 0);
+      return Math.max(0.01, 1 - sum / 100);
+    }
+    return on.reduce(function (a, p) { return a * (1 - (p.rate || 0) / 100); }, 1);
+  }
+  function keepRate(ch, applyDiscount) {
+    var df = applyDiscount ? discountFactor(ch) : 1;
+    return df * (1 - effComm(ch) / 100);
+  }
+  // 게시가 하나로 게스트 결제가·수수료·순수익 계산
+  function breakdown(ch, price, applyDiscount) {
+    var df = applyDiscount ? discountFactor(ch) : 1;
+    var guest = price * df;
+    var fee = guest * effComm(ch) / 100;
+    return { price: price, df: df, guest: guest, fee: fee, net: guest - fee };
+  }
 
-      <div class="callout">
-        <b>참고용 추정 도구입니다.</b> 실제 수수료·프로모션 조건은 각 플랫폼 호스트센터에서, 세금은 세무사와 확인하세요. 부킹닷컴·트립닷컴 계약상 레이트 패리티(최저가 보장) 조항이 있는지도 확인 후 채널별 가격 차등을 적용하세요.
-      </div>
-    </div>
-  </div>
-</div>
+  // 에어비앤비 평일·주말 게시가
+  function airbnbPrices() {
+    var ab = state.channels.airbnb;
+    var k = keepRate(ab, true);
+    var wd, we;
+    if (state.mode === "price") {
+      wd = state.priceInput;
+      we = state.weekendMode === "pct" ? roundTo(wd * (1 + state.weekendPct / 100)) : state.weekendDirectPrice;
+    } else {
+      wd = roundTo(state.netInput / k);
+      var weNet = state.weekendMode === "pct" ? state.netInput * (1 + state.weekendPct / 100) : state.weekendDirectNet;
+      we = roundTo(weNet / k);
+    }
+    return { weekday: wd, weekend: we };
+  }
 
-<script src="app.js"></script>
+  // 에어비앤비 기준 순수익을 다른 채널에서도 남기는 게시가 (가중치만큼 더)
+  function priceFor(ch, baseNet, applyDiscount, keepExact) {
+    if (keepExact != null) return keepExact;
+    return roundTo(baseNet * (1 + ch.weight / 100) / keepRate(ch, applyDiscount));
+  }
+
+  function computeRates() {
+    var ab = state.channels.airbnb;
+    var abP = airbnbPrices();
+    var out = { weekday: {}, weekend: {} };
+    ["weekday", "weekend"].forEach(function (day) {
+      var abB = breakdown(ab, abP[day], true);
+      var baseNet = abB.net / (1 + ab.weight / 100);
+      CH_KEYS.forEach(function (key) {
+        var ch = state.channels[key];
+        var price = key === "airbnb" ? abP[day] : priceFor(ch, baseNet, true);
+        out[day][key] = breakdown(ch, price, true);
+      });
+    });
+    return out;
+  }
+
+  function computeAddon(airbnbFee, applyDiscount) {
+    var ab = state.channels.airbnb;
+    var abB = breakdown(ab, airbnbFee, applyDiscount);
+    var baseNet = abB.net / (1 + ab.weight / 100);
+    var out = {};
+    CH_KEYS.forEach(function (key) {
+      var ch = state.channels[key];
+      var price = key === "airbnb" ? airbnbFee : priceFor(ch, baseNet, applyDiscount);
+      out[key] = breakdown(ch, price, applyDiscount);
+    });
+    return out;
+  }
+
+  function incomeTax(taxable) {
+    if (taxable <= 0) return 0;
+    var b = TAX_BRACKETS.find(function (b) { return taxable <= b.limit; });
+    return Math.max(0, taxable * b.rate - b.deduction);
+  }
+
+  function computeMoney() {
+    var rates = computeRates();
+    var key = state.basis;
+    var wd = rates.weekday[key], we = rates.weekend[key];
+    var n = state.nights;
+    var m = {
+      guest: n.weekday * wd.guest + n.weekend * we.guest,
+      fee: n.weekday * wd.fee + n.weekend * we.fee,
+      net: n.weekday * wd.net + n.weekend * we.net,
+      cleaning: null
+    };
+    if (state.cleaning.on) {
+      var c = computeAddon(state.cleaning.airbnbFee, state.cleaning.applyPromo)[key];
+      var bookings = state.cleaning.avgLOS > 0 ? (n.weekday + n.weekend) / state.cleaning.avgLOS : 0;
+      m.cleaning = { bookings: bookings, guest: bookings * c.guest, fee: bookings * c.fee, net: bookings * c.net };
+      m.guest += m.cleaning.guest; m.fee += m.cleaning.fee; m.net += m.cleaning.net;
+    }
+
+    // 1년 · 세금 — 매출은 게스트 결제액 기준
+    var G = m.guest * 12;
+    var F = m.fee * 12;
+    var t = { gross: G, fees: F };
+    t.taxType = G < SIMPLIFIED_VAT_THRESHOLD ? "simplified" : "general";
+    if (t.taxType === "simplified") {
+      t.vatExempt = G < VAT_EXEMPT_THRESHOLD;
+      t.vat = t.vatExempt ? 0 : G * SIMPLIFIED_VALUE_ADDED_RATE * 0.1;
+      t.revenue = G - t.vat;               // 소득세 수입금액(납부한 부가세 제외)
+    } else {
+      t.vatExempt = false;
+      t.revenue = G / 1.1;                 // 공급가액
+      t.vat = G - t.revenue;               // 매입세액공제 미반영
+    }
+    t.method = t.revenue < SIMPLE_RATIO_LIMIT ? "simple" : "standard";
+    if (t.method === "simple") {
+      t.expenseRatio = EXPENSE_RATIOS.simple;
+      t.ratioExpense = t.revenue * t.expenseRatio / 100;
+      t.feeExpense = 0;
+    } else {
+      t.expenseRatio = EXPENSE_RATIOS.standard;
+      t.ratioExpense = t.revenue * t.expenseRatio / 100;
+      t.feeExpense = F;                    // 플랫폼 수수료를 비용으로 차감
+    }
+    t.income = Math.max(0, t.revenue - t.ratioExpense - t.feeExpense);
+    t.incomeTax = incomeTax(t.income);
+    t.localTax = t.incomeTax * 0.1;
+    t.totalTax = t.vat + t.incomeTax + t.localTax;
+    t.afterTax = G - F - t.totalTax;
+    return { rates: rates, month: m, tax: t };
+  }
+
+  /* ---------- 아이콘 ---------- */
+  var ICON = {
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+    next: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+  };
+
+  /* ---------- 라우팅 ---------- */
+  var VIEWS = ["start", "input", "result", "breakdown", "extra", "cleaning", "money", "settings"];
+  var settingsReturn = "result";
+  function current() {
+    var h = (location.hash || "").replace("#", "");
+    return VIEWS.indexOf(h) >= 0 ? h : "start";
+  }
+  function go(view) {
+    if (view === "settings") settingsReturn = current() === "settings" ? settingsReturn : current();
+    if (location.hash === "#" + view) render(); else location.hash = view;
+  }
+  window.addEventListener("hashchange", function () { render(); window.scrollTo(0, 0); });
+
+  /* ---------- 공통 조각 ---------- */
+  function header(opts) {
+    var left = opts.back
+      ? '<button type="button" class="back" data-go="' + opts.back + '">' + ICON.back + (opts.backLabel || "") + '</button>'
+      : '<span class="brand">레이트 데스크</span>';
+    var right = "";
+    if (opts.step) {
+      right = '<div class="progress" aria-label="' + opts.step + ' / 3단계">' +
+        [1, 2, 3].map(function (i) { return '<span class="' + (i <= opts.step ? "on" : "") + '"></span>'; }).join("") + '</div>';
+    }
+    if (opts.gear) right = '<button type="button" class="icon-link" data-go="settings" aria-label="수수료·프로모션 설정">' + ICON.gear + '</button>';
+    return '<div class="top">' + left + right + '</div>';
+  }
+  function chip(ch, sm) { return '<span class="chip ' + ch.cls + (sm ? " sm" : "") + '" aria-hidden="true">' + ch.code + '</span>'; }
+  function weightTag(ch) { return ch.weight ? '<span class="tag gold">가중치 +' + pct(ch.weight) + '</span>' : ""; }
+  function daySeg() {
+    return '<div class="seg mt" role="group" aria-label="평일·주말">' +
+      ["weekday", "weekend"].map(function (d) {
+        return '<button type="button" data-day="' + d + '" aria-pressed="' + (state.day === d) + '">' + DAY_LABEL[d] + '</button>';
+      }).join("") + '</div>';
+  }
+  function stackLabel(ch) { return ch.stack === "add" ? "합산" : "곱연산"; }
+
+  /* ---------- 화면: 1단계 ---------- */
+  function viewStart() {
+    return header({ step: 1 }) +
+      '<div style="margin-top:28px"><p class="step-no">1 / 3단계</p>' +
+      '<h1>무엇을 기준으로<br>가격을 정할까요?</h1><p class="lead">나중에 언제든 바꿀 수 있어요.</p></div>' +
+      '<div class="choices">' +
+      choice("price", "에어비앤비 평일 가격부터", "지금 에어비앤비에 걸어둔 평일 가격을 넣으면 주말 가격, 부킹·트립 가격, 순수익이 나와요.") +
+      choice("net", "원하는 순수익부터", "1박에 손에 쥐고 싶은 금액을 넣으면 채널마다 얼마에 걸어야 하는지 거꾸로 계산해요.") +
+      '</div><div class="spacer"></div>' +
+      '<button type="button" class="text-link" data-go="settings">수수료 · 프로모션 설정 먼저 확인하기</button>' +
+      '<button type="button" class="primary" data-go="input">다음</button>';
+    function choice(mode, title, desc) {
+      return '<button type="button" class="choice" data-mode="' + mode + '" aria-pressed="' + (state.mode === mode) + '">' +
+        '<span class="radio" aria-hidden="true"></span><span><span class="choice-title">' + title + '</span>' +
+        '<span class="choice-desc">' + desc + '</span></span></button>';
+    }
+  }
+
+  /* ---------- 화면: 2단계 ---------- */
+  function viewInput() {
+    var isPrice = state.mode === "price";
+    var weValue = isPrice ? state.weekendDirectPrice : state.weekendDirectNet;
+    return header({ back: "start", step: 2 }) +
+      '<div style="margin-top:12px"><p class="step-no">2 / 3단계</p>' +
+      '<h1>' + (isPrice ? "에어비앤비 평일 1박 가격을<br>입력하세요" : "평일 1박에 남기고 싶은<br>순수익을 입력하세요") + '</h1></div>' +
+      '<div class="card mt">' +
+      '<label class="big-label" for="main-input">' + (isPrice ? "에어비앤비 평일 1박 게시가" : "평일 1박 목표 순수익") + ' (' + state.extra.base + '명 기준)</label>' +
+      '<div class="big-field"><input id="main-input" type="text" inputmode="numeric" autocomplete="off" data-num="' + (isPrice ? "priceInput" : "netInput") + '" value="' + comma(isPrice ? state.priceInput : state.netInput) + '"><span>원</span></div>' +
+      '<div id="live-main"></div></div>' +
+      '<div class="card mt-s"><p style="margin:0 0 12px;font-size:15px;font-weight:700">주말은 얼마로 할까요?</p>' +
+      '<div class="seg" role="group" aria-label="주말 정하는 방식">' +
+      '<button type="button" data-wmode="pct" aria-pressed="' + (state.weekendMode === "pct") + '">평일보다 % 올리기</button>' +
+      '<button type="button" data-wmode="direct" aria-pressed="' + (state.weekendMode === "direct") + '">직접 입력</button></div>' +
+      (state.weekendMode === "pct"
+        ? '<div class="row-between" style="margin-top:16px"><div class="stepper">' +
+          '<button type="button" data-step="weekendPct" data-delta="-1" aria-label="1% 내리기">−</button>' +
+          '<span class="val" id="we-pct">' + (state.weekendPct >= 0 ? "+" : "") + state.weekendPct + '%</span>' +
+          '<button type="button" data-step="weekendPct" data-delta="1" aria-label="1% 올리기">+</button></div>' +
+          '<div id="live-we" style="text-align:right"></div></div>'
+        : '<div style="margin-top:16px"><label class="field">' + (isPrice ? "에어비앤비 주말 1박 게시가" : "주말 1박 목표 순수익") +
+          '<span class="box-input"><input type="text" inputmode="numeric" data-num="' + (isPrice ? "weekendDirectPrice" : "weekendDirectNet") + '" value="' + comma(weValue) + '"><span>원</span></span></label>' +
+          '<div id="live-we" style="margin-top:8px"></div></div>') +
+      '</div><div class="spacer"></div>' +
+      '<button type="button" class="primary" data-go="result">결과 보기</button>';
+  }
+  function liveInput() {
+    var ab = state.channels.airbnb;
+    var r = computeRates();
+    var wd = r.weekday.airbnb, we = r.weekend.airbnb;
+    var html = "";
+    if (state.mode === "price") {
+      html += '<div class="kv" style="margin-top:14px"><span>게스트 결제가' + (wd.df < 1 ? " (할인 −" + pct((1 - wd.df) * 100) + ")" : "") + '</span><span class="num">' + won(wd.guest) + '</span></div>';
+      html += '<div class="kv strong"><span>내 순수익 (수수료 ' + pct(effComm(ab)) + ' 차감)</span><span class="num">' + won(wd.net) + '</span></div>';
+    } else {
+      html += '<div class="kv" style="margin-top:14px"><span>에어비앤비에 걸 가격</span><span class="num" style="font-weight:700;color:var(--accent)">' + won(wd.price) + '</span></div>';
+      html += '<div class="kv"><span>실제 순수익 (반올림 반영)</span><span class="num">' + won(wd.net) + '</span></div>';
+    }
+    set("live-main", html);
+    var weHtml = state.weekendMode === "pct"
+      ? '<div class="small">주말 1박' + (state.mode === "net" ? " 게시가" : "") + '</div><div class="num" style="font-size:20px;font-weight:700">' + won(we.price) + '</div>'
+      : '<div class="kv"><span>' + (state.mode === "price" ? "주말 순수익" : "에어비앤비 주말 게시가") + '</span><span class="num" style="font-weight:700">' + won(state.mode === "price" ? we.net : we.price) + '</span></div>';
+    set("live-we", weHtml);
+    var p = document.getElementById("we-pct");
+    if (p) p.textContent = (state.weekendPct >= 0 ? "+" : "") + state.weekendPct + "%";
+  }
+
+  /* ---------- 화면: 결과 ---------- */
+  function viewResult() {
+    var all = computeMoney();
+    var r = all.rates[state.day];
+    var rows = CH_KEYS.map(function (key) {
+      var ch = state.channels[key], b = r[key];
+      return '<div class="list-row">' + chip(ch) +
+        '<div class="grow"><div class="ch-name">' + ch.label + (key === "airbnb" ? '<span class="tag">기준</span>' : weightTag(ch)) + '</div>' +
+        '<div class="small">순수익 ' + won(b.net) + '</div></div>' +
+        '<div class="ch-price">' + won(b.price) + '</div></div>';
+    }).join("");
+    return header({ back: "input", step: 3 }) +
+      '<div style="margin-top:12px"><p class="step-no">3 / 3단계 · 결과</p>' +
+      '<h1>이렇게 걸면<br>채널마다 순수익이 맞춰져요</h1></div>' +
+      daySeg() +
+      '<div class="list mt-s">' + rows + '</div>' +
+      '<div class="tiles">' +
+      '<div class="tile"><div class="t-label">한 달 순수익</div><div class="t-val">' + won(all.month.net) + '</div></div>' +
+      '<div class="tile"><div class="t-label">1년 세후 실수령</div><div class="t-val">' + won(all.tax.afterTax) + '</div></div>' +
+      '</div>' +
+      '<p class="note">게시가는 각 채널에 입력할 1박 가격(' + state.extra.base + '명 기준)이에요. 한 달·1년 수익은 ' + state.channels[state.basis].label + '에서 평일 ' + state.nights.weekday + '박 · 주말 ' + state.nights.weekend + '박을 판다고 보고 계산했어요.</p>' +
+      '<h2 class="sec">더 알아볼 정보를 골라보세요</h2>' +
+      '<div class="list">' +
+      menu("breakdown", "가격 계산 과정", "게시가 → 할인 → 수수료 → 순수익") +
+      menu("extra", "인원 추가 요금", state.extra.base + "명 → " + state.extra.max + "명, 채널별 1인당 추가요금") +
+      menu("cleaning", "청소비", state.cleaning.on ? "켜짐 · 채널별 청소비 맞추기" : "받는 경우 채널별 청소비 맞추기") +
+      menu("money", "한 달 · 1년 수익과 세금", "판매 박수 기준, 수수료·세금 뺀 실수령") +
+      menu("settings", "수수료 · 프로모션 설정", "수수료, 할인 추가·켜고 끄기, 가중치") +
+      '</div><div class="spacer"></div>' +
+      '<button type="button" class="text-link muted" data-go="start">처음부터 다시</button>';
+    function menu(view, title, desc) {
+      return '<button type="button" class="menu-row" data-go="' + view + '"><div class="grow"><div class="menu-title">' + title + '</div><div class="menu-desc">' + desc + '</div></div>' + ICON.next + '</button>';
+    }
+  }
+
+  /* ---------- 상세: 가격 계산 과정 ---------- */
+  function viewBreakdown() {
+    var r = computeRates()[state.day];
+    var cards = CH_KEYS.map(function (key) {
+      var ch = state.channels[key], b = r[key];
+      var on = ch.promos.filter(function (p) { return p.on; });
+      var promoTxt = on.length ? on.map(function (p) { return esc(p.name) + " " + pct(p.rate); }).join(" · ") : "적용 중인 할인 없음";
+      return '<div class="card mt-s">' +
+        '<div class="flow-head">' + chip(ch, true) + '<span class="grow">' + ch.label + '</span>' + weightTag(ch) + '</div>' +
+        '<div class="line"><span>게시가</span><span style="font-weight:700">' + won(b.price) + '</span></div>' +
+        '<div class="line minus"><span>할인 ' + stackLabel(ch) + ' −' + pct((1 - b.df) * 100) + '<br><span class="small">' + promoTxt + '</span></span><span>− ' + won(b.price - b.guest) + '</span></div>' +
+        '<div class="line"><span>게스트 결제가</span><span>' + won(b.guest) + '</span></div>' +
+        '<div class="line minus"><span>수수료 ' + pct(effComm(ch)) + (ch.processing ? '<br><span class="small">기본 ' + pct(ch.commission) + ' + 결제대행 ' + pct(ch.processing) + '</span>' : "") + '</span><span>− ' + won(b.fee) + '</span></div>' +
+        '<div class="line total"><span>내 순수익</span><span>' + won(b.net) + '</span></div>' +
+        '</div>';
+    }).join("");
+    return header({ back: "result", backLabel: "결과로" }) +
+      '<h1 style="margin-top:8px">가격 계산 과정</h1>' +
+      '<p class="lead">채널마다 게시가에서 할인과 수수료가 빠지고 순수익이 남아요.</p>' +
+      daySeg() + cards +
+      '<p class="note">부킹닷컴·트립닷컴 순수익이 에어비앤비보다 많은 건 가중치만큼 일부러 더 받도록 했기 때문이에요. 가격은 ' + comma(state.roundUnit) + '원 단위로 반올림해요.</p>';
+  }
+
+  /* ---------- 상세: 인원 추가 요금 ---------- */
+  function viewExtra() {
+    return header({ back: "result", backLabel: "결과로" }) +
+      '<h1 style="margin-top:8px">인원 추가 요금</h1>' +
+      '<p class="lead">에어비앤비 1인당 추가요금만 넣으면, 다른 채널에서도 1인당 같은 순수익이 남도록 계산해요.</p>' +
+      '<div class="card mt"><div class="grid3">' +
+      '<label class="field">기준 인원<span class="box-input"><input type="text" inputmode="numeric" data-num="extra.base" value="' + state.extra.base + '"><span>명</span></span></label>' +
+      '<label class="field">최대 인원<span class="box-input"><input type="text" inputmode="numeric" data-num="extra.max" value="' + state.extra.max + '"><span>명</span></span></label>' +
+      '<label class="field">에어비앤비 1인<span class="box-input"><input type="text" inputmode="numeric" data-num="extra.airbnbFee" value="' + comma(state.extra.airbnbFee) + '"><span>원</span></span></label>' +
+      '</div></div>' +
+      '<div id="live-extra"></div>' +
+      '<p class="note">각 채널의 프로모션 할인이 추가 인원 요금에도 똑같이 적용된다고 가정했어요. 부킹닷컴은 인원별 요금(Occupancy-based pricing)에, 트립닷컴은 추가 인원 요금 설정에 위 1인당 금액을 넣으세요.</p>';
+  }
+  function liveExtra() {
+    var e = computeAddon(state.extra.airbnbFee, true);
+    var r = computeRates()[state.day];
+    var feeRows = CH_KEYS.map(function (key) {
+      var ch = state.channels[key], b = e[key];
+      return '<div class="list-row">' + chip(ch, true) + '<div class="grow"><div class="ch-name">' + ch.label + '</div>' +
+        '<div class="small">결제 ' + won(b.guest) + ' · 순수익 ' + won(b.net) + '</div></div><div class="ch-price" style="font-size:17px">' + won(b.price) + '</div></div>';
+    }).join("");
+    var base = Math.max(1, Math.round(state.extra.base)), max = Math.max(base, Math.round(state.extra.max));
+    if (max - base > 20) max = base + 20;
+    var trs = "";
+    for (var n = base; n <= max; n++) {
+      var add = n - base;
+      trs += '<tr><td><b>' + n + '명</b>' + (add ? '' : '<span class="tag">기준</span>') + '</td>' +
+        CH_KEYS.map(function (key) { return '<td>' + comma(r[key].price + e[key].price * add) + '</td>'; }).join("") + '</tr>';
+    }
+    set("live-extra",
+      '<h2 class="sec">1인당 추가요금 (채널에 입력할 금액)</h2><div class="list">' + feeRows + '</div>' +
+      '<h2 class="sec">인원별 1박 게시가</h2>' + daySeg() +
+      '<div class="card mt-s"><div class="tbl-wrap"><table><thead><tr><th>인원</th>' +
+      CH_KEYS.map(function (k) { return '<th>' + state.channels[k].label + '</th>'; }).join("") +
+      '</tr></thead><tbody>' + trs + '</tbody></table></div><p class="small" style="margin:8px 0 0">단위: 원 · ' + DAY_LABEL[state.day] + ' 기준</p></div>');
+  }
+
+  /* ---------- 상세: 청소비 ---------- */
+  function viewCleaning() {
+    var c = state.cleaning;
+    return header({ back: "result", backLabel: "결과로" }) +
+      '<h1 style="margin-top:8px">청소비</h1>' +
+      '<p class="lead">예약 1건마다 한 번 받는 청소비도 채널별로 순수익이 같아지게 맞춰요.</p>' +
+      '<div class="card mt"><div class="check"><span style="font-weight:600">청소비 받기</span>' +
+      '<button type="button" class="switch" role="switch" data-toggle="cleaning.on" aria-checked="' + c.on + '" aria-label="청소비 받기"></button></div>' +
+      (c.on
+        ? '<div class="grid2" style="margin-top:8px">' +
+          '<label class="field">에어비앤비 청소비<span class="box-input"><input type="text" inputmode="numeric" data-num="cleaning.airbnbFee" value="' + comma(c.airbnbFee) + '"><span>원</span></span></label>' +
+          '<label class="field">평균 숙박일수<span class="box-input"><input type="text" inputmode="decimal" data-num="cleaning.avgLOS" value="' + c.avgLOS + '"><span>박</span></span></label></div>' +
+          '<div class="check" style="margin-top:6px"><span>청소비에도 프로모션 할인 적용</span>' +
+          '<button type="button" class="switch" role="switch" data-toggle="cleaning.applyPromo" aria-checked="' + c.applyPromo + '" aria-label="청소비에 할인 적용"></button></div>'
+        : '') +
+      '</div>' +
+      (c.on ? '<div id="live-cleaning"></div>' : '<p class="note">켜면 한 달·1년 수익에도 청소비가 더해져요. 예약 건수는 판매 박수 ÷ 평균 숙박일수로 추정해요.</p>') +
+      (c.on ? '<p class="note">대부분의 OTA는 할인을 객실 요금에만 적용해서 기본은 꺼져 있어요. 예약 건수는 판매 박수 ÷ 평균 숙박일수로 추정해 한 달·1년 수익에 반영해요.</p>' : '');
+  }
+  function liveCleaning() {
+    if (!state.cleaning.on) return;
+    var e = computeAddon(state.cleaning.airbnbFee, state.cleaning.applyPromo);
+    set("live-cleaning", '<h2 class="sec">채널별 청소비</h2><div class="list">' + CH_KEYS.map(function (key) {
+      var ch = state.channels[key], b = e[key];
+      return '<div class="list-row">' + chip(ch, true) + '<div class="grow"><div class="ch-name">' + ch.label + '</div>' +
+        '<div class="small">결제 ' + won(b.guest) + ' · 순수익 ' + won(b.net) + '</div></div><div class="ch-price" style="font-size:17px">' + won(b.price) + '</div></div>';
+    }).join("") + '</div>');
+  }
+
+  /* ---------- 상세: 한 달 · 1년 ---------- */
+  function viewMoney() {
+    return header({ back: "result", backLabel: "결과로" }) +
+      '<h1 style="margin-top:8px">한 달 · 1년 수익과 세금</h1>' +
+      '<p class="lead">한 달에 몇 박 팔리는지만 넣으면 돼요.</p>' +
+      '<div class="card mt" style="padding-top:6px;padding-bottom:6px">' +
+      nightRow("weekday", "평일 판매") + '<div style="border-top:1px solid var(--line2)"></div>' + nightRow("weekend", "주말 판매") +
+      '</div>' +
+      '<p style="margin:18px 0 8px;font-size:13px;font-weight:600;color:var(--sub)">어느 채널로 판다고 볼까요?</p>' +
+      '<div class="seg" role="group" aria-label="기준 채널">' + CH_KEYS.map(function (k) {
+        return '<button type="button" data-basis="' + k + '" aria-pressed="' + (state.basis === k) + '">' + state.channels[k].label + '</button>';
+      }).join("") + '</div>' +
+      '<div id="live-money"></div>';
+    function nightRow(key, label) {
+      return '<div class="row-between" style="padding:10px 0"><label for="n-' + key + '" style="font-size:14.5px;font-weight:600">' + label + '</label>' +
+        '<div class="stepper"><button type="button" data-step="nights.' + key + '" data-delta="-1" aria-label="' + label + ' 1박 줄이기">−</button>' +
+        '<input id="n-' + key + '" type="text" inputmode="numeric" data-num="nights.' + key + '" value="' + state.nights[key] + '">' +
+        '<button type="button" data-step="nights.' + key + '" data-delta="1" aria-label="' + label + ' 1박 늘리기">+</button></div></div>';
+    }
+  }
+  function liveMoney() {
+    var all = computeMoney(), m = all.month, t = all.tax;
+    var ch = state.channels[state.basis];
+    var methodTag = t.method === "simple"
+      ? '<span class="tag">단순경비율 ' + pct(t.expenseRatio) + '</span>'
+      : '<span class="tag warn">기준경비율 ' + pct(t.expenseRatio) + ' + 수수료 비용처리</span>';
+    var html =
+      '<div class="card mt-s"><div class="small">한 달 순수익 · 플랫폼 수수료 뺀 금액</div>' +
+      '<div class="big-figure">' + won(m.net) + '</div>' +
+      '<div class="line" style="margin-top:8px"><span>게스트 결제액</span><span>' + won(m.guest) + '</span></div>' +
+      '<div class="line minus"><span>플랫폼 수수료</span><span>− ' + won(m.fee) + '</span></div>' +
+      (m.cleaning ? '<div class="line sub"><span>청소비 포함 (예약 약 ' + (Math.round(m.cleaning.bookings * 10) / 10) + '건)</span><span>' + won(m.cleaning.guest) + '</span></div>' : "") +
+      '</div>' +
+      '<h2 class="sec">1년으로 보면</h2>' +
+      '<div class="card" style="padding-top:8px;padding-bottom:4px">' +
+      '<div class="line"><span>연 매출 (게스트 결제액)</span><span>' + won(t.gross) + '</span></div>' +
+      '<div class="line minus"><span>플랫폼 수수료</span><span>− ' + won(t.fees) + '</span></div>' +
+      '<div class="line minus"><span>부가가치세' + (t.vatExempt ? ' <span class="tag green">납부면제</span>' : "") + '</span><span>− ' + won(t.vat) + '</span></div>' +
+      '<div class="line minus"><span>종합소득세</span><span>− ' + won(t.incomeTax) + '</span></div>' +
+      '<div class="line minus"><span>지방소득세</span><span>− ' + won(t.localTax) + '</span></div>' +
+      '<div class="line total"><span>1년 세후 실수령</span><span>' + won(t.afterTax) + '</span></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">' +
+      '<span class="tag">' + (t.taxType === "simplified" ? "간이과세자" : "일반과세자") + ' (자동 판정)</span>' + methodTag + '</div>' +
+      '<details class="why"><summary>세금 계산 근거 보기</summary><div class="card" style="padding-top:6px;padding-bottom:4px;margin-top:6px">' +
+      '<div class="line"><span>연 매출 (' + ch.label + ' 게스트 결제액, 부가세 포함)</span><span>' + won(t.gross) + '</span></div>' +
+      '<div class="line"><span>소득세 수입금액 (' + (t.taxType === "simplified" ? "납부 부가세 제외" : "공급가액 = 매출 ÷ 1.1") + ')</span><span>' + won(t.revenue) + '</span></div>' +
+      '<div class="line minus"><span>' + (t.method === "simple" ? "단순" : "기준") + '경비율 ' + pct(t.expenseRatio) + ' 비용</span><span>− ' + won(t.ratioExpense) + '</span></div>' +
+      (t.method === "standard" ? '<div class="line minus"><span>플랫폼 수수료 (비용 처리)</span><span>− ' + won(t.feeExpense) + '</span></div>' : "") +
+      '<div class="line"><span>사업소득금액 (과세표준)</span><span>' + won(t.income) + '</span></div>' +
+      '</div></details>' +
+      '<p class="note">' +
+      (t.taxType === "simplified"
+        ? (t.vatExempt ? "연 매출 4,800만원 미만이라 간이과세자 부가세 납부가 면제돼요. " : "간이과세자 부가세는 매출 × 부가가치율 25% × 10%로 추정했어요(매입세액공제 미반영). ")
+        : "일반과세자 부가세는 매입세액공제 없이 매출세액만으로 추정했어요. ") +
+      "수입금액이 3,600만원 이상이면 단순경비율 대신 기준경비율을 적용하고 플랫폼 수수료를 비용으로 뺐어요. 실제로는 직전연도 수입금액으로 판정하고, 장부를 쓰면 월세·관리비 같은 다른 비용도 인정돼요. 경비율은 2023년 귀속 고시 기준이에요. 참고용 추정이니 세무사와 확인하세요." +
+      '</p>';
+    set("live-money", html);
+  }
+
+  /* ---------- 설정 ---------- */
+  function viewSettings() {
+    var cards = CH_KEYS.map(function (key) {
+      var ch = state.channels[key];
+      var promos = ch.promos.map(function (p, i) {
+        return '<div class="promo-row' + (p.on ? "" : " off") + '">' +
+          '<input class="name" type="text" aria-label="프로모션 이름" data-promo="' + key + ':' + i + ':name" value="' + esc(p.name) + '">' +
+          '<span class="box-input rate"><input type="text" inputmode="decimal" aria-label="' + esc(p.name) + ' 할인율" data-promo="' + key + ':' + i + ':rate" value="' + p.rate + '"><span>%</span></span>' +
+          '<button type="button" class="switch" role="switch" aria-checked="' + p.on + '" aria-label="' + esc(p.name) + ' 적용" data-promo-toggle="' + key + ':' + i + '"></button>' +
+          '<button type="button" class="del" aria-label="' + esc(p.name) + ' 삭제" data-promo-del="' + key + ':' + i + '">' + ICON.x + '</button></div>';
+      }).join("");
+      var weight = key === "airbnb" ? "" :
+        '<div class="weight-box"><div class="row-between"><span class="w-label">가중치</span><div class="stepper">' +
+        '<button type="button" data-wstep="' + key + '" data-delta="-1" aria-label="' + ch.label + ' 가중치 1% 내리기">−</button>' +
+        '<span class="val" id="w-' + key + '">+' + ch.weight + '%</span>' +
+        '<button type="button" data-wstep="' + key + '" data-delta="1" aria-label="' + ch.label + ' 가중치 1% 올리기">+</button></div></div>' +
+        '<p id="wdesc-' + key + '">' + weightDesc(ch) + '</p></div>';
+      return '<div class="card mt-s"><div class="ch-head">' + chip(ch, true) + '<span class="grow">' + ch.label + '</span>' +
+        (key === "airbnb" ? '<span class="tag">기준 채널</span>' : "") + '</div>' +
+        '<div class="grid2">' +
+        '<label class="field">수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':commission" value="' + ch.commission + '"><span>%</span></span></label>' +
+        '<label class="field">결제대행 수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':processing" value="' + ch.processing + '"><span>%</span></span></label>' +
+        '</div>' + weight +
+        '<p class="promo-title">프로모션 · 할인 ' + stackLabel(ch) + '</p>' + promos +
+        '<button type="button" class="add-btn" data-promo-add="' + key + '">+ 프로모션 추가</button></div>';
+    }).join("");
+    return header({ back: settingsReturn === "settings" ? "result" : settingsReturn, backLabel: "돌아가기" }) +
+      '<h1 style="margin-top:8px">수수료 · 프로모션 설정</h1>' +
+      '<p class="lead">바꾼 값은 이 기기에 자동 저장돼요.</p>' +
+      cards +
+      '<div class="card mt-s"><div class="row-between"><label for="round-unit" style="font-size:14px">가격 반올림 단위</label>' +
+      '<select id="round-unit" class="box-select" data-round>' + [1, 10, 100, 500, 1000].map(function (u) {
+        return '<option value="' + u + '"' + (state.roundUnit === u ? " selected" : "") + '>' + comma(u) + '원</option>';
+      }).join("") + '</select></div></div>' +
+      '<p class="note">에어비앤비·부킹닷컴은 할인을 차례로 곱해서, 트립닷컴은 할인율을 더해서 적용해요. 부킹닷컴·트립닷컴 계약에 레이트 패리티(최저가 보장) 조항이 있는지도 확인하세요.</p>' +
+      '<div class="spacer"></div><button type="button" class="ghost" data-reset>기본값으로 되돌리기</button>';
+  }
+  function weightDesc(ch) {
+    return ch.weight
+      ? "에어비앤비보다 순수익이 " + pct(ch.weight) + " 더 남도록 게시가를 올려요."
+      : "에어비앤비와 순수익이 똑같아지도록 게시가를 맞춰요.";
+  }
+
+  /* ---------- 렌더 ---------- */
+  var app = document.getElementById("app");
+  function set(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+  function render() {
+    var v = current();
+    var html = {
+      start: viewStart, input: viewInput, result: viewResult, breakdown: viewBreakdown,
+      extra: viewExtra, cleaning: viewCleaning, money: viewMoney, settings: viewSettings
+    }[v]();
+    app.innerHTML = html;
+    live();
+  }
+  function live() {
+    var v = current();
+    if (v === "input") liveInput();
+    if (v === "extra") liveExtra();
+    if (v === "cleaning") liveCleaning();
+    if (v === "money") liveMoney();
+  }
+
+  function setPath(path, value) {
+    var parts = path.split(".");
+    var cur = state;
+    for (var i = 0; i < parts.length - 1; i++) cur = cur[parts[i]];
+    cur[parts[parts.length - 1]] = value;
+  }
+  function getPath(path) {
+    return path.split(".").reduce(function (o, k) { return o[k]; }, state);
+  }
+
+  /* ---------- 이벤트 ---------- */
+  app.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    var d = t.dataset;
+    if (d.go) { go(d.go); return; }
+    if (d.mode) { state.mode = d.mode; save(); render(); return; }
+    if (d.wmode) { state.weekendMode = d.wmode; save(); render(); return; }
+    if (d.day) { state.day = d.day; save(); render(); return; }
+    if (d.basis) { state.basis = d.basis; save(); render(); return; }
+    if (d.step) {
+      var v = Math.max(d.step === "weekendPct" ? -50 : 0, getPath(d.step) + Number(d.delta));
+      setPath(d.step, v); save();
+      var inp = app.querySelector('[data-num="' + d.step + '"]');
+      if (inp) inp.value = v;
+      live(); return;
+    }
+    if (d.wstep) {
+      var ch = state.channels[d.wstep];
+      ch.weight = Math.max(0, Math.min(100, ch.weight + Number(d.delta)));
+      save();
+      document.getElementById("w-" + d.wstep).textContent = "+" + ch.weight + "%";
+      document.getElementById("wdesc-" + d.wstep).textContent = weightDesc(ch);
+      return;
+    }
+    if (d.toggle) { setPath(d.toggle, !getPath(d.toggle)); save(); render(); return; }
+    if (d.promoToggle) {
+      var a = d.promoToggle.split(":"); var p = state.channels[a[0]].promos[+a[1]];
+      p.on = !p.on; save();
+      t.setAttribute("aria-checked", p.on);
+      t.closest(".promo-row").classList.toggle("off", !p.on);
+      return;
+    }
+    if (d.promoDel) {
+      var b = d.promoDel.split(":"); state.channels[b[0]].promos.splice(+b[1], 1); save(); render(); return;
+    }
+    if (d.promoAdd) {
+      state.channels[d.promoAdd].promos.push({ name: "새 프로모션", rate: 5, on: true }); save(); render();
+      var rows = app.querySelectorAll('[data-promo^="' + d.promoAdd + ':"][data-promo$=":name"]');
+      if (rows.length) { var last = rows[rows.length - 1]; last.focus(); last.select(); }
+      return;
+    }
+    if (d.reset !== undefined) {
+      state = defaults(); save(); render(); return;
+    }
+  });
+
+  app.addEventListener("input", function (e) {
+    var t = e.target, d = t.dataset;
+    if (d.num) { setPath(d.num, parseNum(t.value)); save(); live(); return; }
+    if (d.ch) { var a = d.ch.split(":"); state.channels[a[0]][a[1]] = parseNum(t.value); save(); return; }
+    if (d.promo) {
+      var b = d.promo.split(":"); var p = state.channels[b[0]].promos[+b[1]];
+      p[b[2]] = b[2] === "rate" ? parseNum(t.value) : t.value; save(); return;
+    }
+  });
+  app.addEventListener("change", function (e) {
+    if (e.target.dataset.round !== undefined) { state.roundUnit = Number(e.target.value); save(); }
+  });
+  // 큰 금액 입력칸은 포커스가 빠지면 천 단위 쉼표로 정리
+  app.addEventListener("focusout", function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.num) {
+      var v = getPath(t.dataset.num);
+      t.value = v >= 1000 ? comma(v) : String(v);
+    }
+  });
+
+  render();
+
+  // 계산 함수 노출 (검증용)
+  window.__rateDesk = { computeRates: computeRates, computeMoney: computeMoney, computeAddon: computeAddon, state: function () { return state; } };
+})();
+</script>
 </body>
 </html>
