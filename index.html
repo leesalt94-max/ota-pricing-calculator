@@ -243,6 +243,8 @@ td .tag { margin-left: 4px; }
 .del svg { width: 18px; height: 18px; }
 .cost-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line2); }
 .cost-row .proof { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--sub); white-space: nowrap; }
+.cost-row .wht-row { flex-basis: 100%; display: flex; align-items: center; gap: 10px; background: var(--line2); border-radius: 10px; padding: 8px 12px; font-size: 13.5px; font-weight: 600; }
+.cost-row .wht-row .small { font-weight: 400; }
 .cost-row .break { flex-basis: 100%; height: 0; }
 .cost-row .name { flex: 1 1 0; min-width: 0; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 14px; font-weight: 600; background: var(--card); }
 .cost-row .amount { flex: 1 1 0; min-width: 0; }
@@ -295,6 +297,7 @@ details.why[open] summary::before { content: "▾ "; }
     { limit: Infinity, rate: 0.45, deduction: 65940000 }
   ];
   var STORE_KEY = "rate-desk-v2";
+  var WHT_RATE = 0.033;                     // 사업소득 원천징수: 소득세 3% + 지방소득세 0.3%
   var CH_KEYS = ["airbnb", "booking", "trip"];
   var DAY_LABEL = { weekday: "평일", weekend: "주말" };
 
@@ -321,9 +324,9 @@ details.why[open] summary::before { content: "▾ "; }
       cleaning: { applyPromo: false },  // 청소비는 채널별 cleaningFee, 0원이면 받지 않음
       avgLOS: 2,                // 평균 숙박일수 — 예약(청소) 건수 추정용
       costs: [                  // 운영 비용 — unit: month(매달) | year(1년) | clean(청소 1회)
-        { name: "월세", amount: 800000, unit: "month", proof: true },
-        { name: "청소 인건비", amount: 50000, unit: "clean", proof: true },
-        { name: "집기 구입비", amount: 0, unit: "year", proof: true }
+        { name: "월세", amount: 800000, unit: "month", proof: true, wht: false },
+        { name: "청소 인건비", amount: 50000, unit: "clean", proof: true, wht: false },
+        { name: "집기 구입비", amount: 0, unit: "year", proof: true, wht: false }
       ],
       nights: { weekday: 16, weekend: 8 },
       basis: "airbnb"
@@ -355,7 +358,10 @@ details.why[open] summary::before { content: "▾ "; }
       }
       out.nights = Object.assign(defaults().nights, s.nights || {});
       out.costs = Array.isArray(s.costs) ? s.costs : defaults().costs;
-      out.costs.forEach(function (ci) { if (typeof ci.proof !== "boolean") ci.proof = true; });
+      out.costs.forEach(function (ci) {
+        if (typeof ci.proof !== "boolean") ci.proof = true;
+        if (typeof ci.wht !== "boolean") ci.wht = false;
+      });
       if (typeof s.avgLOS !== "number" && s.cleaning && typeof s.cleaning.avgLOS === "number") out.avgLOS = s.cleaning.avgLOS;
       return out;
     } catch (e) { return d; }
@@ -461,9 +467,16 @@ details.why[open] summary::before { content: "▾ "; }
     var n = state.nights;
     return state.avgLOS > 0 ? Math.round((n.weekday + n.weekend) / state.avgLOS) : 0;
   }
-  // 청소 1회당 드리는 인건비 (운영 비용 중 '청소 1회' 항목 합계)
+  // 원천징수 대상이면 입력액을 '받는 분 실수령액'으로 보고, 원천세를 더한 총지급액이 실제 비용
+  function costInfo(ci) {
+    var a = parseNum(ci.amount);
+    var wht = ci.proof !== false && !!ci.wht;
+    var gross = wht ? a / (1 - WHT_RATE) : a;
+    return { paid: a, wht: wht, tax: gross - a, gross: gross };
+  }
+  // 청소 1회당 드리는 인건비 (운영 비용 중 '청소 1회' 항목 합계, 원천세 포함)
   function laborPerCleaning() {
-    return state.costs.reduce(function (a, ci) { return a + (ci.unit === "clean" ? parseNum(ci.amount) : 0); }, 0);
+    return state.costs.reduce(function (a, ci) { return a + (ci.unit === "clean" ? costInfo(ci).gross : 0); }, 0);
   }
 
   function incomeTax(taxable) {
@@ -494,9 +507,9 @@ details.why[open] summary::before { content: "▾ "; }
     }
     // 운영 비용 (월 환산)
     m.costItems = state.costs.map(function (ci) {
-      var a = parseNum(ci.amount);
+      var info = costInfo(ci), a = info.gross;
       var monthly = ci.unit === "year" ? a / 12 : ci.unit === "clean" ? a * bookings : a;
-      return { name: ci.name, unit: ci.unit, amount: a, monthly: monthly, proof: ci.proof !== false };
+      return { name: ci.name, unit: ci.unit, amount: a, paid: info.paid, wht: info.wht, whtTax: info.tax, monthly: monthly, proof: ci.proof !== false };
     }).filter(function (ci) { return ci.monthly > 0; });
     m.costs = m.costItems.reduce(function (a, ci) { return a + ci.monthly; }, 0);
     m.proofCosts = m.costItems.reduce(function (a, ci) { return a + (ci.proof ? ci.monthly : 0); }, 0);
@@ -767,6 +780,7 @@ details.why[open] summary::before { content: "▾ "; }
   }
   function liveCleaning() {
     var labor = laborPerCleaning();
+    var laborWht = state.costs.reduce(function (a, ci) { return a + (ci.unit === "clean" ? costInfo(ci).tax : 0); }, 0);
     var rows = CH_KEYS.map(function (key) {
       var ch = state.channels[key];
       var b = breakdown(ch, ch.cleaningFee || 0, state.cleaning.applyPromo);
@@ -777,7 +791,7 @@ details.why[open] summary::before { content: "▾ "; }
             '<div class="line minus"><span>플랫폼 수수료 ' + pct(effComm(ch)) + '</span><span>− ' + won(b.fee) + '</span></div>' +
             '<div class="line"><span>내 몫</span><span>' + won(b.net) + '</span></div>'
           : '<div class="line sub"><span>청소비를 받지 않아요</span><span>0원</span></div>') +
-        '<div class="line minus"><span>청소하시는 분께 드리는 돈</span><span>− ' + won(labor) + '</span></div>' +
+        '<div class="line minus"><span>청소 인건비' + (laborWht > 0 ? '<br><span class="small">실지급 ' + won(labor - laborWht) + ' + 원천세 ' + won(laborWht) + '</span>' : "") + '</span><span>− ' + won(labor) + '</span></div>' +
         '<div class="line total"><span>청소 1회당 남는 돈</span><span' + (left < 0 ? ' style="color:var(--warn-ink)"' : "") + '>' + won(left) + '</span></div>' +
         '</div>';
     }).join("");
@@ -788,7 +802,7 @@ details.why[open] summary::before { content: "▾ "; }
       '<span class="box-input" style="width:96px"><input id="avg-los2" type="text" inputmode="decimal" data-num="avgLOS" value="' + state.avgLOS + '"><span>박</span></span></div>' +
       '<p class="small" style="margin:10px 0 0">한 달 판매 ' + (n.weekday + n.weekend) + '박 ÷ 평균 ' + state.avgLOS + '박 = <b id="clean-count" style="color:var(--ink)">청소 ' + cleaningsPerMonth() + '회</b> (반올림)</p></div>' +
       '<h2 class="sec">채널별 청소 1회 정산</h2>' + rows +
-      '<p class="note">청소비는 매출에 포함되고, 수수료도 청소비까지 포함한 금액에 붙어요. 청소하시는 분께 드리는 돈은 설정 › 운영 비용의 \'청소 1회\' 항목(지금 ' + won(labor) + ')이에요. 대부분의 OTA는 할인을 객실 요금에만 적용해서 할인 적용은 기본으로 꺼져 있어요.</p>');
+      '<p class="note">청소비는 매출에 포함되고, 수수료도 청소비까지 포함한 금액에 붙어요. 청소 인건비는 설정 › 운영 비용의 \'청소 1회\' 항목(지금 원천세 포함 ' + won(labor) + ')이에요. 대부분의 OTA는 할인을 객실 요금에만 적용해서 할인 적용은 기본으로 꺼져 있어요.</p>');
   }
 
   /* ---------- 상세: 한 달 · 1년 ---------- */
@@ -820,6 +834,7 @@ details.why[open] summary::before { content: "▾ "; }
     var costLines = m.costItems.map(function (ci) {
       var how = ci.unit === "clean" ? won(ci.amount) + " × " + m.bookings + "회"
         : ci.unit === "year" ? "1년 " + won(ci.amount) + " ÷ 12" : "매달 " + won(ci.amount);
+      if (ci.wht) how += " · 실지급 " + won(ci.paid) + " + 원천세 " + won(ci.whtTax);
       return '<div class="line minus sub"><span>' + esc(ci.name) + (ci.proof ? "" : ' <span class="tag warn">증빙 없음</span>') + ' <span class="small">(' + how + ')</span></span><span>− ' + won(ci.monthly) + '</span></div>';
     }).join("");
     var html =
@@ -905,6 +920,12 @@ details.why[open] summary::before { content: "▾ "; }
       '<p class="note">에어비앤비·부킹닷컴은 할인을 차례로 곱해서, 트립닷컴은 할인율을 더해서 적용해요. 부킹닷컴·트립닷컴 계약에 레이트 패리티(최저가 보장) 조항이 있는지도 확인하세요.</p>' +
       '<div class="spacer"></div><button type="button" class="ghost" data-reset>기본값으로 되돌리기</button>';
   }
+  function whtDesc(ci) {
+    var info = costInfo(ci);
+    return info.wht
+      ? "받는 분 실수령 " + won(info.paid) + " + 원천세 " + won(info.tax) + " = 실제 비용 " + won(info.gross)
+      : "사업소득으로 지급하면 3.3%를 떼고 신고해야 비용으로 인정돼요";
+  }
   function costCard() {
     var units = [["month", "매달"], ["year", "1년"], ["clean", "청소 1회"]];
     var rows = state.costs.map(function (ci, i) {
@@ -917,7 +938,12 @@ details.why[open] summary::before { content: "▾ "; }
         '<select class="box-select unit" aria-label="' + esc(ci.name) + ' 주기" data-cost="' + i + ':unit">' +
         units.map(function (u) { return '<option value="' + u[0] + '"' + (ci.unit === u[0] ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") +
         '</select>' +
-        '<button type="button" class="del" aria-label="' + esc(ci.name) + ' 삭제" data-cost-del="' + i + '">' + ICON.x + '</button></div>';
+        '<button type="button" class="del" aria-label="' + esc(ci.name) + ' 삭제" data-cost-del="' + i + '">' + ICON.x + '</button>' +
+        (ci.proof !== false
+          ? '<div class="wht-row"><span class="grow">원천징수 3.3%<br><span class="small" id="wht-d-' + i + '">' + whtDesc(ci) + '</span></span>' +
+            '<button type="button" class="switch" role="switch" aria-checked="' + !!ci.wht + '" aria-label="' + esc(ci.name) + ' 원천징수" data-cost-wht="' + i + '"></button></div>'
+          : "") +
+        '</div>';
     }).join("");
     return '<div class="card mt-s"><div class="ch-head"><span class="grow">운영 비용</span></div>' +
       '<p class="small" style="margin:-8px 0 8px">월세처럼 매달 나가는 돈, 1년에 한 번 드는 돈, 청소할 때마다 드리는 돈을 넣으면 실제 수익에서 빼요. 증빙이 있는 비용만 세금 계산 때 비용으로 인정해요.</p>' +
@@ -1007,13 +1033,18 @@ details.why[open] summary::before { content: "▾ "; }
     }
     if (d.costProof !== undefined) {
       var ci = state.costs[+d.costProof]; ci.proof = ci.proof === false; save();
-      t.setAttribute("aria-checked", ci.proof);
-      var lab = document.getElementById("proof-l-" + d.costProof); if (lab) lab.textContent = "증빙 " + (ci.proof ? "있음" : "없음");
+      var y = window.scrollY; render(); window.scrollTo(0, y);
+      return;
+    }
+    if (d.costWht !== undefined) {
+      var cw = state.costs[+d.costWht]; cw.wht = !cw.wht; save();
+      t.setAttribute("aria-checked", cw.wht);
+      var wd = document.getElementById("wht-d-" + d.costWht); if (wd) wd.textContent = whtDesc(cw);
       return;
     }
     if (d.costDel !== undefined) { state.costs.splice(+d.costDel, 1); save(); render(); return; }
     if (d.costAdd !== undefined) {
-      state.costs.push({ name: "새 비용", amount: 0, unit: "month", proof: true }); save(); render();
+      state.costs.push({ name: "새 비용", amount: 0, unit: "month", proof: true, wht: false }); save(); render();
       var cs = app.querySelectorAll('[data-cost$=":name"]');
       if (cs.length) { var lc = cs[cs.length - 1]; lc.focus(); lc.select(); }
       return;
@@ -1033,7 +1064,9 @@ details.why[open] summary::before { content: "▾ "; }
     if (d.ch) { var a = d.ch.split(":"); state.channels[a[0]][a[1]] = parseNum(t.value); save(); if (d.live !== undefined) liveCleaning(); return; }
     if (d.cost) {
       var c = d.cost.split(":"); var item = state.costs[+c[0]];
-      item[c[1]] = c[1] === "amount" ? parseNum(t.value) : t.value; save(); return;
+      item[c[1]] = c[1] === "amount" ? parseNum(t.value) : t.value; save();
+      var wdd = document.getElementById("wht-d-" + c[0]); if (wdd) wdd.textContent = whtDesc(item);
+      return;
     }
     if (d.promo) {
       var b = d.promo.split(":"); var p = state.channels[b[0]].promos[+b[1]];
