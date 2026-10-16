@@ -230,7 +230,9 @@ td .tag { margin-left: 4px; }
 .del { flex: none; width: 32px; height: 42px; border: none; background: none; color: #8B95A1; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .del svg { width: 18px; height: 18px; }
 .cost-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line2); }
-.cost-row .name { flex: 1 1 100%; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 14px; font-weight: 600; background: var(--card); }
+.cost-row .proof { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--sub); white-space: nowrap; }
+.cost-row .break { flex-basis: 100%; height: 0; }
+.cost-row .name { flex: 1 1 0; min-width: 0; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 14px; font-weight: 600; background: var(--card); }
 .cost-row .amount { flex: 1 1 0; min-width: 0; }
 .cost-row .amount input { text-align: right; }
 .cost-row .unit { flex: none; width: 104px; padding: 0 8px; font-size: 13.5px; }
@@ -307,9 +309,9 @@ details.why[open] summary::before { content: "▾ "; }
       cleaning: { on: false, airbnbFee: 30000, applyPromo: false },
       avgLOS: 2,                // 평균 숙박일수 — 예약(청소) 건수 추정용
       costs: [                  // 운영 비용 — unit: month(매달) | year(1년) | clean(청소 1회)
-        { name: "월세", amount: 800000, unit: "month" },
-        { name: "청소 인건비", amount: 50000, unit: "clean" },
-        { name: "집기 구입비", amount: 0, unit: "year" }
+        { name: "월세", amount: 800000, unit: "month", proof: true },
+        { name: "청소 인건비", amount: 50000, unit: "clean", proof: true },
+        { name: "집기 구입비", amount: 0, unit: "year", proof: true }
       ],
       nights: { weekday: 16, weekend: 8 },
       basis: "airbnb"
@@ -337,6 +339,7 @@ details.why[open] summary::before { content: "▾ "; }
       out.cleaning = Object.assign(defaults().cleaning, s.cleaning || {});
       out.nights = Object.assign(defaults().nights, s.nights || {});
       out.costs = Array.isArray(s.costs) ? s.costs : defaults().costs;
+      out.costs.forEach(function (ci) { if (typeof ci.proof !== "boolean") ci.proof = true; });
       if (typeof s.avgLOS !== "number" && s.cleaning && typeof s.cleaning.avgLOS === "number") out.avgLOS = s.cleaning.avgLOS;
       return out;
     } catch (e) { return d; }
@@ -465,16 +468,18 @@ details.why[open] summary::before { content: "▾ "; }
     m.costItems = state.costs.map(function (ci) {
       var a = parseNum(ci.amount);
       var monthly = ci.unit === "year" ? a / 12 : ci.unit === "clean" ? a * bookings : a;
-      return { name: ci.name, unit: ci.unit, amount: a, monthly: monthly };
+      return { name: ci.name, unit: ci.unit, amount: a, monthly: monthly, proof: ci.proof !== false };
     }).filter(function (ci) { return ci.monthly > 0; });
     m.costs = m.costItems.reduce(function (a, ci) { return a + ci.monthly; }, 0);
+    m.proofCosts = m.costItems.reduce(function (a, ci) { return a + (ci.proof ? ci.monthly : 0); }, 0);
     m.real = m.net - m.costs;
 
     // 1년 · 세금 — 매출은 게스트 결제액 기준
     var G = m.guest * 12;
     var F = m.fee * 12;
     var C = m.costs * 12;
-    var t = { gross: G, fees: F, costs: C };
+    var CP = m.proofCosts * 12;
+    var t = { gross: G, fees: F, costs: C, proofCosts: CP };
     t.taxType = G < SIMPLIFIED_VAT_THRESHOLD ? "simplified" : "general";
     if (t.taxType === "simplified") {
       t.vatExempt = G < VAT_EXEMPT_THRESHOLD;
@@ -495,7 +500,7 @@ details.why[open] summary::before { content: "▾ "; }
       t.expenseRatio = EXPENSE_RATIOS.standard;
       t.ratioExpense = t.revenue * t.expenseRatio / 100;
       t.feeExpense = F;                    // 플랫폼 수수료를 비용으로 차감
-      t.costExpense = C;                   // 월세·청소 인건비·집기 등 운영 비용 차감 (증빙 필요)
+      t.costExpense = m.proofCosts * 12;   // 운영 비용 중 증빙 있는 것만 차감
     }
     t.income = Math.max(0, t.revenue - t.ratioExpense - t.feeExpense - t.costExpense);
     t.incomeTax = incomeTax(t.income);
@@ -769,7 +774,7 @@ details.why[open] summary::before { content: "▾ "; }
     var costLines = m.costItems.map(function (ci) {
       var how = ci.unit === "clean" ? won(ci.amount) + " × 약 " + (Math.round(m.bookings * 10) / 10) + "회"
         : ci.unit === "year" ? "1년 " + won(ci.amount) + " ÷ 12" : "매달 " + won(ci.amount);
-      return '<div class="line minus sub"><span>' + esc(ci.name) + ' <span class="small">(' + how + ')</span></span><span>− ' + won(ci.monthly) + '</span></div>';
+      return '<div class="line minus sub"><span>' + esc(ci.name) + (ci.proof ? "" : ' <span class="tag warn">증빙 없음</span>') + ' <span class="small">(' + how + ')</span></span><span>− ' + won(ci.monthly) + '</span></div>';
     }).join("");
     var html =
       '<div class="card mt-s"><div class="small">한 달 실제 수익 · 수수료와 운영 비용 뺀 금액 (세전)</div>' +
@@ -801,7 +806,8 @@ details.why[open] summary::before { content: "▾ "; }
       '<div class="line minus"><span>' + (t.method === "simple" ? "단순" : "기준") + '경비율 ' + pct(t.expenseRatio) + ' 비용</span><span>− ' + won(t.ratioExpense) + '</span></div>' +
       (t.method === "standard"
         ? '<div class="line minus"><span>플랫폼 수수료 (비용 처리)</span><span>− ' + won(t.feeExpense) + '</span></div>' +
-          '<div class="line minus"><span>운영 비용 (월세 · 인건비 · 집기 등)</span><span>− ' + won(t.costExpense) + '</span></div>'
+          '<div class="line minus"><span>운영 비용 중 증빙 있는 것</span><span>− ' + won(t.costExpense) + '</span></div>' +
+          (t.costs - t.proofCosts > 0.5 ? '<div class="line sub"><span>증빙 없는 비용 ' + won(t.costs - t.proofCosts) + '은 세금 계산에서 빼지 않아요</span><span></span></div>' : "")
         : '<div class="line sub"><span>단순경비율에는 운영 비용이 이미 포함된 것으로 봐서 따로 빼지 않아요</span><span></span></div>') +
       '<div class="line"><span>사업소득금액 (과세표준)</span><span>' + won(t.income) + '</span></div>' +
       '</div></details>' +
@@ -809,7 +815,7 @@ details.why[open] summary::before { content: "▾ "; }
       (t.taxType === "simplified"
         ? (t.vatExempt ? "연 매출 4,800만원 미만이라 간이과세자 부가세 납부가 면제돼요. " : "간이과세자 부가세는 매출 × 부가가치율 25% × 10%로 추정했어요(매입세액공제 미반영). ")
         : "일반과세자 부가세는 매입세액공제 없이 매출세액만으로 추정했어요. ") +
-      "수입금액이 3,600만원 이상이면 단순경비율 대신 기준경비율을 적용하고, 플랫폼 수수료와 운영 비용을 비용으로 뺐어요. 월세·인건비는 계약서·이체내역·원천징수 신고 같은 증빙이 있어야 인정돼요. 실제 판정은 직전연도 수입금액 기준이고, 경비율은 2023년 귀속 고시 기준이에요. 참고용 추정이니 세무사와 확인하세요." +
+      "수입금액이 3,600만원 이상이면 단순경비율 대신 기준경비율을 적용하고, 플랫폼 수수료와 '증빙 있음'으로 표시한 운영 비용을 비용으로 뺐어요. 월세는 계약서·이체내역, 인건비는 원천징수 신고 같은 증빙이 있어야 인정돼요. 실제 판정은 직전연도 수입금액 기준이고, 경비율은 2023년 귀속 고시 기준이에요. 참고용 추정이니 세무사와 확인하세요." +
       '</p>';
     set("live-money", html);
   }
@@ -857,6 +863,9 @@ details.why[open] summary::before { content: "▾ "; }
     var rows = state.costs.map(function (ci, i) {
       return '<div class="cost-row">' +
         '<input class="name" type="text" aria-label="비용 이름" data-cost="' + i + ':name" value="' + esc(ci.name) + '">' +
+        '<span class="proof"><span id="proof-l-' + i + '">증빙 ' + (ci.proof !== false ? "있음" : "없음") + '</span>' +
+        '<button type="button" class="switch" role="switch" aria-checked="' + (ci.proof !== false) + '" aria-label="' + esc(ci.name) + ' 증빙 있음" data-cost-proof="' + i + '"></button></span>' +
+        '<span class="break" aria-hidden="true"></span>' +
         '<span class="box-input amount"><input type="text" inputmode="numeric" aria-label="' + esc(ci.name) + ' 금액" data-cost="' + i + ':amount" value="' + comma(ci.amount) + '"><span>원</span></span>' +
         '<select class="box-select unit" aria-label="' + esc(ci.name) + ' 주기" data-cost="' + i + ':unit">' +
         units.map(function (u) { return '<option value="' + u[0] + '"' + (ci.unit === u[0] ? " selected" : "") + '>' + u[1] + '</option>'; }).join("") +
@@ -864,7 +873,7 @@ details.why[open] summary::before { content: "▾ "; }
         '<button type="button" class="del" aria-label="' + esc(ci.name) + ' 삭제" data-cost-del="' + i + '">' + ICON.x + '</button></div>';
     }).join("");
     return '<div class="card mt-s"><div class="ch-head"><span class="grow">운영 비용</span></div>' +
-      '<p class="small" style="margin:-8px 0 8px">월세처럼 매달 나가는 돈, 1년에 한 번 드는 돈, 청소할 때마다 드리는 돈을 넣으면 실제 수익에서 빼요.</p>' +
+      '<p class="small" style="margin:-8px 0 8px">월세처럼 매달 나가는 돈, 1년에 한 번 드는 돈, 청소할 때마다 드리는 돈을 넣으면 실제 수익에서 빼요. 증빙이 있는 비용만 세금 계산 때 비용으로 인정해요.</p>' +
       rows +
       '<button type="button" class="add-btn" data-cost-add>+ 비용 추가</button>' +
       '<div class="row-between" style="margin-top:14px"><label for="avg-los" style="font-size:14px">평균 숙박일수<br><span class="small">청소 횟수 = 판매 박수 ÷ 평균 숙박일수</span></label>' +
@@ -949,9 +958,15 @@ details.why[open] summary::before { content: "▾ "; }
       if (rows.length) { var last = rows[rows.length - 1]; last.focus(); last.select(); }
       return;
     }
+    if (d.costProof !== undefined) {
+      var ci = state.costs[+d.costProof]; ci.proof = ci.proof === false; save();
+      t.setAttribute("aria-checked", ci.proof);
+      var lab = document.getElementById("proof-l-" + d.costProof); if (lab) lab.textContent = "증빙 " + (ci.proof ? "있음" : "없음");
+      return;
+    }
     if (d.costDel !== undefined) { state.costs.splice(+d.costDel, 1); save(); render(); return; }
     if (d.costAdd !== undefined) {
-      state.costs.push({ name: "새 비용", amount: 0, unit: "month" }); save(); render();
+      state.costs.push({ name: "새 비용", amount: 0, unit: "month", proof: true }); save(); render();
       var cs = app.querySelectorAll('[data-cost$=":name"]');
       if (cs.length) { var lc = cs[cs.length - 1]; lc.focus(); lc.select(); }
       return;
