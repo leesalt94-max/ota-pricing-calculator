@@ -295,6 +295,9 @@ details.why[open] summary::before { content: "▾ "; }
   /* ---------- 상수 ---------- */
   // 국세청 업종코드 551007(공유숙박업) 2023년 귀속 고시 경비율 — 매년 갱신되니 최신 고시 확인 필요
   var EXPENSE_RATIOS = { simple: 84.6, standard: 17.3 };
+  // 기준경비율 소득금액 상한: 단순경비율 소득금액 × 배율 (소득세법 시행령 제143조)
+  // 간편장부대상자 2.8배, 복식부기의무자(숙박업 직전연도 수입 1억5천만원 이상) 3.4배
+  var BOOKKEEPING_LIMIT = 150000000;
   var SIMPLE_RATIO_LIMIT = 36000000;       // 숙박업 단순경비율 적용 기준: 직전연도 수입금액 3,600만원 미만
   var SIMPLIFIED_VAT_THRESHOLD = 104000000; // 간이과세자 기준: 연 공급대가 1억 4백만원 미만
   var VAT_EXEMPT_THRESHOLD = 48000000;      // 간이과세자 납부면제: 연 공급대가 4,800만원 미만
@@ -565,10 +568,18 @@ details.why[open] summary::before { content: "▾ "; }
     } else {
       t.expenseRatio = EXPENSE_RATIOS.standard;
       t.ratioExpense = t.revenue * t.expenseRatio / 100;
-      t.feeExpense = F;                    // 플랫폼 수수료를 비용으로 차감
-      t.costExpense = m.proofCosts * 12;   // 운영 비용 중 증빙 있는 것만 차감
+      // 기준경비율: 소득 = 수입 − 주요경비(매입비용·임차료·인건비, 증빙 있는 것) − 수입 × 기준경비율
+      // 플랫폼 수수료는 주요경비가 아니라 기준경비율 안에 포함된 것으로 봄
+      t.feeExpense = 0;
+      t.costExpense = m.proofCosts * 12;
     }
-    t.income = Math.max(0, t.revenue - t.ratioExpense - t.feeExpense - t.costExpense);
+    t.income = Math.max(0, t.revenue - t.ratioExpense - t.costExpense);
+    t.capMult = t.revenue < BOOKKEEPING_LIMIT ? 2.8 : 3.4;
+    t.simpleIncome = t.revenue * (1 - EXPENSE_RATIOS.simple / 100);
+    t.capIncome = t.simpleIncome * t.capMult;
+    t.stdIncome = t.income;
+    t.capApplied = t.method === "standard" && t.capIncome < t.income;
+    if (t.capApplied) t.income = t.capIncome;
     t.incomeTax = incomeTax(t.income);
     t.localTax = t.incomeTax * 0.1;
     t.totalTax = t.vat + t.incomeTax + t.localTax;
@@ -855,7 +866,7 @@ details.why[open] summary::before { content: "▾ "; }
     var ch = state.channels[state.basis];
     var methodTag = t.method === "simple"
       ? '<span class="tag">단순경비율 ' + pct(t.expenseRatio) + '</span>'
-      : '<span class="tag warn">기준경비율 ' + pct(t.expenseRatio) + ' + 수수료·운영비 비용처리</span>';
+      : '<span class="tag warn">기준경비율 ' + pct(t.expenseRatio) + (t.capApplied ? ' · 상한 ' + t.capMult + '배 적용' : '') + '</span>';
     var costLines = m.costItems.map(function (ci) {
       var how = ci.unit === "clean" ? won(ci.amount) + " × " + m.bookings + "회"
         : ci.unit === "year" ? "1년 " + won(ci.amount) + " ÷ 12" : "매달 " + won(ci.amount);
@@ -891,9 +902,12 @@ details.why[open] summary::before { content: "▾ "; }
       '<div class="line"><span>소득세 수입금액 (' + (t.taxType === "simplified" ? "납부 부가세 제외" : "공급가액 = 매출 ÷ 1.1") + ')</span><span>' + won(t.revenue) + '</span></div>' +
       '<div class="line minus"><span>' + (t.method === "simple" ? "단순" : "기준") + '경비율 ' + pct(t.expenseRatio) + ' 비용</span><span>− ' + won(t.ratioExpense) + '</span></div>' +
       (t.method === "standard"
-        ? '<div class="line minus"><span>플랫폼 수수료 (비용 처리)</span><span>− ' + won(t.feeExpense) + '</span></div>' +
-          '<div class="line minus"><span>운영 비용 중 증빙 있는 것</span><span>− ' + won(t.costExpense) + '</span></div>' +
-          (t.costs - t.proofCosts > 0.5 ? '<div class="line sub"><span>증빙 없는 비용 ' + won(t.costs - t.proofCosts) + '은 세금 계산에서 빼지 않아요</span><span></span></div>' : "")
+        ? '<div class="line minus"><span>주요경비 (증빙 있는 운영 비용)</span><span>− ' + won(t.costExpense) + '</span></div>' +
+          (t.costs - t.proofCosts > 0.5 ? '<div class="line sub"><span>증빙 없는 비용 ' + won(t.costs - t.proofCosts) + '은 세금 계산에서 빼지 않아요</span><span></span></div>' : "") +
+          '<div class="line sub"><span>플랫폼 수수료는 주요경비가 아니라 기준경비율에 포함돼요</span><span></span></div>' +
+          '<div class="line"><span>기준경비율 소득금액</span><span>' + won(t.stdIncome) + '</span></div>' +
+          '<div class="line"><span>상한: 단순경비율 소득 ' + won(t.simpleIncome) + ' × ' + t.capMult + '배</span><span>' + won(t.capIncome) + '</span></div>' +
+          (t.capApplied ? '<div class="line sub"><span>상한이 더 작아서 상한 금액으로 계산해요</span><span></span></div>' : "")
         : '<div class="line sub"><span>단순경비율에는 운영 비용이 이미 포함된 것으로 봐서 따로 빼지 않아요</span><span></span></div>') +
       '<div class="line"><span>사업소득금액 (과세표준)</span><span>' + won(t.income) + '</span></div>' +
       '</div></details>' +
@@ -901,7 +915,7 @@ details.why[open] summary::before { content: "▾ "; }
       (t.taxType === "simplified"
         ? (t.vatExempt ? "연 매출 4,800만원 미만이라 간이과세자 부가세 납부가 면제돼요. " : "간이과세자 부가세는 매출 × 부가가치율 25% × 10%로 추정했어요(매입세액공제 미반영). ")
         : "일반과세자 부가세는 매입세액공제 없이 매출세액만으로 추정했어요. ") +
-      "수입금액이 3,600만원 이상이면 단순경비율 대신 기준경비율을 적용하고, 플랫폼 수수료와 '증빙 있음'으로 표시한 운영 비용을 비용으로 뺐어요. 월세는 계약서·이체내역, 인건비는 원천징수 신고 같은 증빙이 있어야 인정돼요. 실제 판정은 직전연도 수입금액 기준이고, 경비율은 2023년 귀속 고시 기준이에요. 참고용 추정이니 세무사와 확인하세요." +
+      "수입금액이 3,600만원 이상이면 기준경비율로 계산해요. 소득 = 수입 − 주요경비('증빙 있음' 운영 비용: 임차료·인건비·매입비용) − 수입 × 기준경비율이고, 단순경비율 소득의 2.8배(간편장부대상자)를 넘지 못해요. 월세는 계약서·이체내역, 인건비는 원천징수 신고가 있어야 인정돼요. 실제 판정은 직전연도 수입금액 기준이고, 경비율은 2023년 귀속 고시 기준이에요. 참고용 추정이니 세무사와 확인하세요." +
       '</p>';
     set("live-money", html);
   }
