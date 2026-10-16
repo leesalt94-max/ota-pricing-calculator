@@ -298,15 +298,15 @@ details.why[open] summary::before { content: "▾ "; }
       day: "weekday",
       roundUnit: 100,
       channels: {
-        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply",
+        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply", cleaningFee: 0,
                    promos: [{ name: "조기예약 할인", rate: 5, on: true }] },
-        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply",
+        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply", cleaningFee: 0,
                    promos: [{ name: "베이직 할인", rate: 50, on: true }, { name: "모바일 할인", rate: 10, on: true }, { name: "지니어스 할인", rate: 10, on: true }] },
-        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15.5, processing: 0, weight: 8, stack: "add",
+        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15.5, processing: 0, weight: 8, stack: "add", cleaningFee: 0,
                    promos: [{ name: "모바일 할인", rate: 10, on: true }, { name: "회원 할인", rate: 15, on: true }] }
       },
       extra: { base: 4, max: 8, airbnbFee: 17219 },
-      cleaning: { on: false, airbnbFee: 30000, applyPromo: false },
+      cleaning: { applyPromo: false },  // 청소비는 채널별 cleaningFee, 0원이면 받지 않음
       avgLOS: 2,                // 평균 숙박일수 — 예약(청소) 건수 추정용
       costs: [                  // 운영 비용 — unit: month(매달) | year(1년) | clean(청소 1회)
         { name: "월세", amount: 800000, unit: "month", proof: true },
@@ -331,12 +331,16 @@ details.why[open] summary::before { content: "▾ "; }
       CH_KEYS.forEach(function (k) {
         if (s.channels && s.channels[k]) {
           var c = s.channels[k];
-          ["commission", "processing", "weight"].forEach(function (f) { if (typeof c[f] === "number") out.channels[k][f] = c[f]; });
+          ["commission", "processing", "weight", "cleaningFee"].forEach(function (f) { if (typeof c[f] === "number") out.channels[k][f] = c[f]; });
           if (Array.isArray(c.promos)) out.channels[k].promos = c.promos;
         }
       });
       out.extra = Object.assign(defaults().extra, s.extra || {});
       out.cleaning = Object.assign(defaults().cleaning, s.cleaning || {});
+      // 예전 버전(에어비앤비 기준 청소비) 저장값 옮기기
+      if (s.cleaning && s.cleaning.on && typeof s.cleaning.airbnbFee === "number" && !(s.channels && s.channels.airbnb && typeof s.channels.airbnb.cleaningFee === "number")) {
+        CH_KEYS.forEach(function (k) { out.channels[k].cleaningFee = s.cleaning.airbnbFee; });
+      }
       out.nights = Object.assign(defaults().nights, s.nights || {});
       out.costs = Array.isArray(s.costs) ? s.costs : defaults().costs;
       out.costs.forEach(function (ci) { if (typeof ci.proof !== "boolean") ci.proof = true; });
@@ -440,6 +444,16 @@ details.why[open] summary::before { content: "▾ "; }
     return out;
   }
 
+  // 한 달 청소(예약) 횟수 = 판매 박수 ÷ 평균 숙박일수, 반올림한 정수
+  function cleaningsPerMonth() {
+    var n = state.nights;
+    return state.avgLOS > 0 ? Math.round((n.weekday + n.weekend) / state.avgLOS) : 0;
+  }
+  // 청소 1회당 드리는 인건비 (운영 비용 중 '청소 1회' 항목 합계)
+  function laborPerCleaning() {
+    return state.costs.reduce(function (a, ci) { return a + (ci.unit === "clean" ? parseNum(ci.amount) : 0); }, 0);
+  }
+
   function incomeTax(taxable) {
     if (taxable <= 0) return 0;
     var b = TAX_BRACKETS.find(function (b) { return taxable <= b.limit; });
@@ -457,11 +471,13 @@ details.why[open] summary::before { content: "▾ "; }
       net: n.weekday * wd.net + n.weekend * we.net,
       cleaning: null
     };
-    var bookings = state.avgLOS > 0 ? (n.weekday + n.weekend) / state.avgLOS : 0;
+    var bookings = cleaningsPerMonth();
     m.bookings = bookings;
-    if (state.cleaning.on) {
-      var c = computeAddon(state.cleaning.airbnbFee, state.cleaning.applyPromo)[key];
-      m.cleaning = { bookings: bookings, guest: bookings * c.guest, fee: bookings * c.fee, net: bookings * c.net };
+    m.room = { guest: m.guest, fee: m.fee, net: m.net };
+    var cf = state.channels[key].cleaningFee || 0;
+    if (cf > 0) {
+      var c = breakdown(state.channels[key], cf, state.cleaning.applyPromo);
+      m.cleaning = { bookings: bookings, per: c, guest: bookings * c.guest, fee: bookings * c.fee, net: bookings * c.net };
       m.guest += m.cleaning.guest; m.fee += m.cleaning.fee; m.net += m.cleaning.net;
     }
     // 운영 비용 (월 환산)
@@ -646,7 +662,7 @@ details.why[open] summary::before { content: "▾ "; }
       '<div class="list">' +
       menu("breakdown", "가격 계산 과정", "게시가 → 할인 → 수수료 → 순수익") +
       menu("extra", "인원 추가 요금", state.extra.base + "명 → " + state.extra.max + "명, 채널별 1인당 추가요금") +
-      menu("cleaning", "청소비", state.cleaning.on ? "켜짐 · 채널별 청소비 맞추기" : "받는 경우 채널별 청소비 맞추기") +
+      menu("cleaning", "청소비", "채널별 청소비 · 청소 1회당 남는 돈") +
       menu("money", "한 달 · 1년 실제 수익과 세금", "수수료 · 운영 비용 · 세금까지 뺀 실제 수익") +
       menu("settings", "설정", "수수료 · 프로모션 · 가중치 · 운영 비용") +
       '</div><div class="spacer"></div>' +
@@ -718,31 +734,52 @@ details.why[open] summary::before { content: "▾ "; }
 
   /* ---------- 상세: 청소비 ---------- */
   function viewCleaning() {
-    var c = state.cleaning;
+    var rows = CH_KEYS.map(function (key) {
+      var ch = state.channels[key];
+      return '<div class="row-between" style="padding:8px 0">' +
+        '<label for="cf-' + key + '" style="display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600">' + chip(ch, true) + ch.label + '</label>' +
+        '<span class="box-input" style="width:150px"><input id="cf-' + key + '" type="text" inputmode="numeric" data-ch="' + key + ':cleaningFee" data-live value="' + comma(ch.cleaningFee) + '"><span>원</span></span></div>';
+    }).join("");
     return header({ back: "result", backLabel: "결과로" }) +
       '<h1 style="margin-top:8px">청소비</h1>' +
-      '<p class="lead">예약 1건마다 한 번 받는 청소비도 채널별로 순수익이 같아지게 맞춰요.</p>' +
-      '<div class="card mt"><div class="check"><span style="font-weight:600">청소비 받기</span>' +
-      '<button type="button" class="switch" role="switch" data-toggle="cleaning.on" aria-checked="' + c.on + '" aria-label="청소비 받기"></button></div>' +
-      (c.on
-        ? '<div class="grid2" style="margin-top:8px">' +
-          '<label class="field">에어비앤비 청소비<span class="box-input"><input type="text" inputmode="numeric" data-num="cleaning.airbnbFee" value="' + comma(c.airbnbFee) + '"><span>원</span></span></label>' +
-          '<label class="field">평균 숙박일수<span class="box-input"><input type="text" inputmode="decimal" data-num="avgLOS" value="' + state.avgLOS + '"><span>박</span></span></label></div>' +
-          '<div class="check" style="margin-top:6px"><span>청소비에도 프로모션 할인 적용</span>' +
-          '<button type="button" class="switch" role="switch" data-toggle="cleaning.applyPromo" aria-checked="' + c.applyPromo + '" aria-label="청소비에 할인 적용"></button></div>'
-        : '') +
+      '<p class="lead">예약 1건마다 게스트에게 받는 청소비를 채널별로 정하세요. 0원이면 받지 않는 걸로 계산해요.</p>' +
+      '<div class="card mt">' + rows +
+      '<div class="check" style="border-top:1px solid var(--line2);margin-top:6px"><span>청소비에도 프로모션 할인 적용</span>' +
+      '<button type="button" class="switch" role="switch" data-toggle="cleaning.applyPromo" aria-checked="' + state.cleaning.applyPromo + '" aria-label="청소비에 할인 적용"></button></div>' +
       '</div>' +
-      (c.on ? '<div id="live-cleaning"></div>' : '<p class="note">켜면 한 달·1년 수익에도 청소비가 더해져요. 예약 건수는 판매 박수 ÷ 평균 숙박일수로 추정해요.</p>') +
-      (c.on ? '<p class="note">대부분의 OTA는 할인을 객실 요금에만 적용해서 기본은 꺼져 있어요. 예약 건수는 판매 박수 ÷ 평균 숙박일수로 추정해 한 달·1년 수익에 반영해요.</p>' : '');
+      '<div id="live-cleaning"></div>';
+  }
+  // 청소 화면에서 평균 숙박일수를 고칠 때 입력칸 포커스를 잃지 않도록 다시 그린 뒤 커서 복원
+  function liveCleaningKeepFocus(input) {
+    var id = input.id, pos = input.selectionStart;
+    liveCleaning();
+    var el = document.getElementById(id);
+    if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch (e) {} }
   }
   function liveCleaning() {
-    if (!state.cleaning.on) return;
-    var e = computeAddon(state.cleaning.airbnbFee, state.cleaning.applyPromo);
-    set("live-cleaning", '<h2 class="sec">채널별 청소비</h2><div class="list">' + CH_KEYS.map(function (key) {
-      var ch = state.channels[key], b = e[key];
-      return '<div class="list-row">' + chip(ch, true) + '<div class="grow"><div class="ch-name">' + ch.label + '</div>' +
-        '<div class="small">결제 ' + won(b.guest) + ' · 순수익 ' + won(b.net) + '</div></div><div class="ch-price" style="font-size:17px">' + won(b.price) + '</div></div>';
-    }).join("") + '</div>');
+    var labor = laborPerCleaning();
+    var rows = CH_KEYS.map(function (key) {
+      var ch = state.channels[key];
+      var b = breakdown(ch, ch.cleaningFee || 0, state.cleaning.applyPromo);
+      var left = b.net - labor;
+      return '<div class="card mt-s"><div class="flow-head">' + chip(ch, true) + '<span class="grow">' + ch.label + '</span></div>' +
+        (ch.cleaningFee > 0
+          ? '<div class="line"><span>게스트가 내는 청소비' + (b.df < 1 ? ' <span class="small">(할인 −' + pct((1 - b.df) * 100) + ')</span>' : "") + '</span><span>' + won(b.guest) + '</span></div>' +
+            '<div class="line minus"><span>플랫폼 수수료 ' + pct(effComm(ch)) + '</span><span>− ' + won(b.fee) + '</span></div>' +
+            '<div class="line"><span>내 몫</span><span>' + won(b.net) + '</span></div>'
+          : '<div class="line sub"><span>청소비를 받지 않아요</span><span>0원</span></div>') +
+        '<div class="line minus"><span>청소하시는 분께 드리는 돈</span><span>− ' + won(labor) + '</span></div>' +
+        '<div class="line total"><span>청소 1회당 남는 돈</span><span' + (left < 0 ? ' style="color:var(--warn-ink)"' : "") + '>' + won(left) + '</span></div>' +
+        '</div>';
+    }).join("");
+    var n = state.nights;
+    set("live-cleaning",
+      '<h2 class="sec">한 달 청소 횟수</h2>' +
+      '<div class="card"><div class="row-between"><label for="avg-los2" style="font-size:14px">평균 숙박일수</label>' +
+      '<span class="box-input" style="width:96px"><input id="avg-los2" type="text" inputmode="decimal" data-num="avgLOS" value="' + state.avgLOS + '"><span>박</span></span></div>' +
+      '<p class="small" style="margin:10px 0 0">한 달 판매 ' + (n.weekday + n.weekend) + '박 ÷ 평균 ' + state.avgLOS + '박 = <b id="clean-count" style="color:var(--ink)">청소 ' + cleaningsPerMonth() + '회</b> (반올림)</p></div>' +
+      '<h2 class="sec">채널별 청소 1회 정산</h2>' + rows +
+      '<p class="note">청소비는 매출에 포함되고, 수수료도 청소비까지 포함한 금액에 붙어요. 청소하시는 분께 드리는 돈은 설정 › 운영 비용의 \'청소 1회\' 항목(지금 ' + won(labor) + ')이에요. 대부분의 OTA는 할인을 객실 요금에만 적용해서 할인 적용은 기본으로 꺼져 있어요.</p>');
   }
 
   /* ---------- 상세: 한 달 · 1년 ---------- */
@@ -772,7 +809,7 @@ details.why[open] summary::before { content: "▾ "; }
       ? '<span class="tag">단순경비율 ' + pct(t.expenseRatio) + '</span>'
       : '<span class="tag warn">기준경비율 ' + pct(t.expenseRatio) + ' + 수수료·운영비 비용처리</span>';
     var costLines = m.costItems.map(function (ci) {
-      var how = ci.unit === "clean" ? won(ci.amount) + " × 약 " + (Math.round(m.bookings * 10) / 10) + "회"
+      var how = ci.unit === "clean" ? won(ci.amount) + " × " + m.bookings + "회"
         : ci.unit === "year" ? "1년 " + won(ci.amount) + " ÷ 12" : "매달 " + won(ci.amount);
       return '<div class="line minus sub"><span>' + esc(ci.name) + (ci.proof ? "" : ' <span class="tag warn">증빙 없음</span>') + ' <span class="small">(' + how + ')</span></span><span>− ' + won(ci.monthly) + '</span></div>';
     }).join("");
@@ -780,7 +817,7 @@ details.why[open] summary::before { content: "▾ "; }
       '<div class="card mt-s"><div class="small">한 달 실제 수익 · 수수료와 운영 비용 뺀 금액 (세전)</div>' +
       '<div class="big-figure"' + (m.real < 0 ? ' style="color:var(--warn-ink)"' : "") + '>' + won(m.real) + '</div>' +
       '<div class="line" style="margin-top:8px"><span>게스트 결제액</span><span>' + won(m.guest) + '</span></div>' +
-      (m.cleaning ? '<div class="line sub"><span>└ 청소비 수입 포함</span><span>' + won(m.cleaning.guest) + '</span></div>' : "") +
+      (m.cleaning ? '<div class="line sub"><span>└ 그중 청소비 (' + won(m.cleaning.per.guest) + ' × ' + m.bookings + '회)</span><span>' + won(m.cleaning.guest) + '</span></div>' : "") +
       '<div class="line minus"><span>플랫폼 수수료</span><span>− ' + won(m.fee) + '</span></div>' +
       '<div class="line"><span>순수익 (수수료 뺀 금액)</span><span>' + won(m.net) + '</span></div>' +
       (m.costItems.length ? costLines : '<div class="line sub"><span>운영 비용 없음</span><span>0원</span></div>') +
@@ -842,6 +879,7 @@ details.why[open] summary::before { content: "▾ "; }
         '<div class="grid2">' +
         '<label class="field">수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':commission" value="' + ch.commission + '"><span>%</span></span></label>' +
         '<label class="field">결제대행 수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':processing" value="' + ch.processing + '"><span>%</span></span></label>' +
+        '<label class="field" style="grid-column:1 / -1">청소비 (예약 1건, 게스트에게 받는 돈)<span class="box-input"><input type="text" inputmode="numeric" data-ch="' + key + ':cleaningFee" value="' + comma(ch.cleaningFee) + '"><span>원</span></span></label>' +
         '</div>' + weight +
         '<p class="promo-title">프로모션 · 할인 ' + stackLabel(ch) + '</p>' + promos +
         '<button type="button" class="add-btn" data-promo-add="' + key + '">+ 프로모션 추가</button></div>';
@@ -978,8 +1016,12 @@ details.why[open] summary::before { content: "▾ "; }
 
   app.addEventListener("input", function (e) {
     var t = e.target, d = t.dataset;
-    if (d.num) { setPath(d.num, parseNum(t.value)); save(); live(); return; }
-    if (d.ch) { var a = d.ch.split(":"); state.channels[a[0]][a[1]] = parseNum(t.value); save(); return; }
+    if (d.num) {
+      setPath(d.num, parseNum(t.value)); save();
+      if (current() === "cleaning") { var cc = document.getElementById("clean-count"); if (cc) { liveCleaningKeepFocus(t); return; } }
+      live(); return;
+    }
+    if (d.ch) { var a = d.ch.split(":"); state.channels[a[0]][a[1]] = parseNum(t.value); save(); if (d.live !== undefined) liveCleaning(); return; }
     if (d.cost) {
       var c = d.cost.split(":"); var item = state.costs[+c[0]];
       item[c[1]] = c[1] === "amount" ? parseNum(t.value) : t.value; save(); return;
@@ -996,6 +1038,9 @@ details.why[open] summary::before { content: "▾ "; }
   // 큰 금액 입력칸은 포커스가 빠지면 천 단위 쉼표로 정리
   app.addEventListener("focusout", function (e) {
     var t = e.target;
+    if (t.dataset && t.dataset.ch && /:cleaningFee$/.test(t.dataset.ch)) {
+      t.value = comma(state.channels[t.dataset.ch.split(":")[0]].cleaningFee);
+    }
     if (t.dataset && t.dataset.cost && /:amount$/.test(t.dataset.cost)) {
       t.value = comma(state.costs[+t.dataset.cost.split(":")[0]].amount);
     }
