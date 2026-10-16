@@ -145,13 +145,18 @@ h2.sec { margin: 28px 0 10px; font-size: 16px; font-weight: 700; }
   background: var(--accent); color: #FFFFFF; font-size: 17px; font-weight: 700;
 }
 .primary:active { background: var(--accent-ink); }
-.bottom-row { display: flex; gap: 10px; }
-.bottom-row .primary { flex: 1 1 auto; width: auto; }
-.settings-btn {
-  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 56px; padding: 0 20px;
-  border-radius: 16px; border: 1px solid var(--line); background: var(--card); font-size: 16px; font-weight: 700; color: var(--ink);
+.settings-card {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 76px; padding: 16px 18px; margin-bottom: 28px;
+  border: 1px solid var(--line); border-radius: 18px; background: var(--card); text-align: left; color: var(--ink);
 }
-.settings-btn svg { width: 20px; height: 20px; color: var(--sub); }
+.settings-card:active { background: var(--line2); }
+.settings-card .gear-wrap {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.settings-card .gear-wrap svg { width: 24px; height: 24px; }
+.settings-card > svg { flex: none; width: 20px; height: 20px; color: #B0B8C1; }
+.settings-card .menu-title { font-size: 16px; font-weight: 700; }
 .text-link {
   align-self: center; border: none; background: none; font-size: 13.5px; font-weight: 500; color: var(--accent);
   padding: 12px; text-decoration: underline; text-underline-offset: 3px;
@@ -587,9 +592,11 @@ details.why[open] summary::before { content: "▾ "; }
       choice("price", "에어비앤비 평일 가격부터", "지금 에어비앤비에 걸어둔 평일 가격을 넣으면 주말 가격, 부킹·트립 가격, 순수익이 나와요.") +
       choice("net", "원하는 순수익부터", "1박에 손에 쥐고 싶은 금액을 넣으면 채널마다 얼마에 걸어야 하는지 거꾸로 계산해요.") +
       '</div><div class="spacer"></div>' +
-      '<div class="bottom-row">' +
-      '<button type="button" class="settings-btn" data-go="settings">' + ICON.gear + '설정</button>' +
-      '<button type="button" class="primary" data-go="input">다음</button></div>';
+      '<button type="button" class="settings-card" data-go="settings">' +
+      '<span class="gear-wrap">' + ICON.gear + '</span>' +
+      '<span class="grow"><span class="menu-title" style="display:block">설정 먼저 확인하기</span>' +
+      '<span class="menu-desc" style="display:block">수수료 · 프로모션 · 청소비 · 운영 비용</span></span>' + ICON.next + '</button>' +
+      '<button type="button" class="primary" data-go="input">다음</button>';
     function choice(mode, title, desc) {
       return '<button type="button" class="choice" data-mode="' + mode + '" aria-pressed="' + (state.mode === mode) + '">' +
         '<span class="radio" aria-hidden="true"></span><span><span class="choice-title">' + title + '</span>' +
