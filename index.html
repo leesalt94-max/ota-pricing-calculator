@@ -145,6 +145,13 @@ h2.sec { margin: 28px 0 10px; font-size: 16px; font-weight: 700; }
   background: var(--accent); color: #FFFFFF; font-size: 17px; font-weight: 700;
 }
 .primary:active { background: var(--accent-ink); }
+.bottom-row { display: flex; gap: 10px; }
+.bottom-row .primary { flex: 1 1 auto; width: auto; }
+.settings-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 56px; padding: 0 20px;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--card); font-size: 16px; font-weight: 700; color: var(--ink);
+}
+.settings-btn svg { width: 20px; height: 20px; color: var(--sub); }
 .text-link {
   align-self: center; border: none; background: none; font-size: 13.5px; font-weight: 500; color: var(--accent);
   padding: 12px; text-decoration: underline; text-underline-offset: 3px;
@@ -580,8 +587,9 @@ details.why[open] summary::before { content: "▾ "; }
       choice("price", "에어비앤비 평일 가격부터", "지금 에어비앤비에 걸어둔 평일 가격을 넣으면 주말 가격, 부킹·트립 가격, 순수익이 나와요.") +
       choice("net", "원하는 순수익부터", "1박에 손에 쥐고 싶은 금액을 넣으면 채널마다 얼마에 걸어야 하는지 거꾸로 계산해요.") +
       '</div><div class="spacer"></div>' +
-      '<button type="button" class="text-link" data-go="settings">수수료 · 프로모션 설정 먼저 확인하기</button>' +
-      '<button type="button" class="primary" data-go="input">다음</button>';
+      '<div class="bottom-row">' +
+      '<button type="button" class="settings-btn" data-go="settings">' + ICON.gear + '설정</button>' +
+      '<button type="button" class="primary" data-go="input">다음</button></div>';
     function choice(mode, title, desc) {
       return '<button type="button" class="choice" data-mode="' + mode + '" aria-pressed="' + (state.mode === mode) + '">' +
         '<span class="radio" aria-hidden="true"></span><span><span class="choice-title">' + title + '</span>' +
@@ -639,8 +647,7 @@ details.why[open] summary::before { content: "▾ "; }
 
   /* ---------- 화면: 결과 ---------- */
   function viewResult() {
-    var all = computeMoney();
-    var r = all.rates[state.day];
+    var r = computeRates()[state.day];
     var rows = CH_KEYS.map(function (key) {
       var ch = state.channels[key], b = r[key];
       return '<div class="list-row">' + chip(ch) +
@@ -653,18 +660,13 @@ details.why[open] summary::before { content: "▾ "; }
       '<h1>이렇게 걸면<br>채널마다 순수익이 맞춰져요</h1></div>' +
       daySeg() +
       '<div class="list mt-s">' + rows + '</div>' +
-      '<div class="tiles">' +
-      '<div class="tile"><div class="t-label">한 달 실제 수익</div><div class="t-val">' + won(all.month.real) + '</div></div>' +
-      '<div class="tile"><div class="t-label">1년 실제 수익 (세후)</div><div class="t-val">' + won(all.tax.afterTax) + '</div></div>' +
-      '</div>' +
-      '<p class="note">게시가는 각 채널에 입력할 1박 가격(' + state.extra.base + '명 기준)이에요. 실제 수익은 ' + state.channels[state.basis].label + '에서 평일 ' + state.nights.weekday + '박 · 주말 ' + state.nights.weekend + '박을 판다고 보고, 수수료와 운영 비용(월세·청소 인건비 등)을 뺀 금액이에요.</p>' +
+      '<p class="note">게시가는 각 채널에 입력할 1박 가격(' + state.extra.base + '명 기준)이에요.</p>' +
       '<h2 class="sec">더 알아볼 정보를 골라보세요</h2>' +
       '<div class="list">' +
       menu("breakdown", "가격 계산 과정", "게시가 → 할인 → 수수료 → 순수익") +
       menu("extra", "인원 추가 요금", state.extra.base + "명 → " + state.extra.max + "명, 채널별 1인당 추가요금") +
       menu("cleaning", "청소비", "채널별 청소비 · 청소 1회당 남는 돈") +
       menu("money", "한 달 · 1년 실제 수익과 세금", "수수료 · 운영 비용 · 세금까지 뺀 실제 수익") +
-      menu("settings", "설정", "수수료 · 프로모션 · 가중치 · 운영 비용") +
       '</div><div class="spacer"></div>' +
       '<button type="button" class="text-link muted" data-go="start">처음부터 다시</button>';
     function menu(view, title, desc) {
