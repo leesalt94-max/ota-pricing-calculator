@@ -1099,7 +1099,7 @@ details.why[open] summary::before { content: "▾ "; }
     if (d.saveSettings !== undefined) {
       persist(); settingsDirty = false; settingsSnap = pickSettings(state);
       toast("설정을 저장했어요");
-      go(settingsReturn === "settings" ? "start" : settingsReturn);
+      go("start");
       return;
     }
   });
