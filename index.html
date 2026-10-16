@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>채널별 레이트 데스크</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="shell">
+  <div class="masthead">
+    <div>
+      <div class="eyebrow">Rate Desk</div>
+      <h1>채널별 레이트 데스크</h1>
+      <p>목표 순수익을 입력하면 에어비앤비 · 부킹닷컴 · 트립닷컴에 걸 게시가를 역산합니다.</p>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT RAIL: INPUTS -->
+    <div class="rail">
+      <div class="panel">
+        <h2>목표 순수익 &amp; 판매량</h2>
+        <p class="desc">수수료·할인을 모두 뗀 뒤 실제 손에 들어오는 1박당 금액 기준입니다.</p>
+        <div class="field-row">
+          <div class="field">
+            <label>평일 목표 순수익</label>
+            <div class="unit-input"><input type="number" id="target-weekday" value="110000" step="1000"><span class="unit">원</span></div>
+          </div>
+          <div class="field">
+            <label>주말 목표 순수익</label>
+            <div class="unit-input"><input type="number" id="target-weekend" value="140000" step="1000"><span class="unit">원</span></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>월 평일 판매 박수</label>
+            <div class="unit-input"><input type="number" id="nights-weekday" value="16" step="1"><span class="unit">박</span></div>
+          </div>
+          <div class="field">
+            <label>월 주말 판매 박수</label>
+            <div class="unit-input"><input type="number" id="nights-weekend" value="8" step="1"><span class="unit">박</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>플랫폼 설정</h2>
+        <p class="desc">가중치를 올리면 그 채널만 게시가가 더 비싸집니다 — 에어비앤비를 주력으로 쓰고 싶을 때 부킹·트립 쪽을 올리세요.</p>
+        <div id="platform-cards"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: OUTPUT -->
+    <div class="output">
+      <section>
+        <div class="section-label">
+          <span class="index">01</span>
+          <h2>채널별 가격표</h2>
+          <span class="hint">여러 프로모션은 곱연산(복리)으로 함께 적용됩니다</span>
+        </div>
+        <div class="table-card">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>채널</th><th>게시가</th><th>게스트 결제가</th><th>실제 순수익</th></tr>
+              </thead>
+              <tbody id="price-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">
+          <span class="index">02</span>
+          <h2>채널별 월간 · 연간 순수익</h2>
+          <span class="hint">동일한 월 판매 박수를 그 채널 하나로 전부 채웠다고 가정했을 때</span>
+        </div>
+        <div class="table-card">
+          <div class="compare-grid" id="compare-grid"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-label">
+          <span class="index">03</span>
+          <h2>세금 추정</h2>
+          <span class="hint">한국 개인사업자 · 종합소득세 + 부가가치세 기준 단순 추정</span>
+        </div>
+        <div class="table-card">
+          <div class="tax-controls">
+            <div class="field">
+              <label>기준 채널</label>
+              <div class="segmented" id="tax-basis-toggle">
+                <button data-basis="airbnb" aria-pressed="true">에어비앤비</button>
+                <button data-basis="booking" aria-pressed="false">부킹닷컴</button>
+                <button data-basis="trip" aria-pressed="false">트립닷컴</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>과세유형 (자동 판정)</label>
+              <span class="status-pill" id="tax-type-pill"><span class="dot"></span><span id="tax-type-label"></span></span>
+            </div>
+            <div class="field">
+              <label>경비율 방식</label>
+              <div class="segmented" id="expense-method-toggle">
+                <button data-method="simple" aria-pressed="true">단순경비율 84.6%</button>
+                <button data-method="standard" aria-pressed="false">기준경비율 17.3%</button>
+              </div>
+            </div>
+          </div>
+          <div class="tax-body" id="tax-body"></div>
+          <div class="tax-headline">
+            <span class="label">세후 예상 실수령액 (연간)</span>
+            <span class="figure" id="tax-final"></span>
+          </div>
+          <details class="detail-toggle">
+            <summary>매출·공급가액 계산 근거 보기</summary>
+            <div class="detail-toggle-body" id="tax-detail"></div>
+          </details>
+          <p class="note" id="tax-note"></p>
+        </div>
+      </section>
+
+      <div class="callout">
+        <b>참고용 추정 도구입니다.</b> 실제 수수료·프로모션 조건은 각 플랫폼 호스트센터에서, 세금은 세무사와 확인하세요. 부킹닷컴·트립닷컴 계약상 레이트 패리티(최저가 보장) 조항이 있는지도 확인 후 채널별 가격 차등을 적용하세요.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
