@@ -703,7 +703,12 @@ details.why[open] summary::before { content: "▾ "; }
     }
     set("live-main", html);
     var weHtml = state.weekendMode === "pct"
-      ? '<div class="small">주말 1박' + (state.mode === "net" ? " 게시가" : "") + '</div><div class="num" style="font-size:20px;font-weight:700">' + won(we.price) + '</div>'
+      // 평일과 같은 기준으로 보여 준다: 가격부터면 주말 게시가, 순수익부터면 주말 목표 순수익 (작은 글씨로 나머지 하나)
+      ? (state.mode === "net"
+        ? '<div class="small">주말 1박 목표 순수익</div><div class="num" style="font-size:20px;font-weight:700">' + won(state.netInput * (1 + state.weekendPct / 100)) + '</div>' +
+          '<div class="small">에어비앤비 주말 게시가 ' + won(we.price) + '</div>'
+        : '<div class="small">주말 1박 게시가</div><div class="num" style="font-size:20px;font-weight:700">' + won(we.price) + '</div>' +
+          '<div class="small">주말 순수익 ' + won(we.net) + '</div>')
       : '<div class="kv"><span>' + (state.mode === "price" ? "주말 순수익" : "에어비앤비 주말 게시가") + '</span><span class="num" style="font-weight:700">' + won(state.mode === "price" ? we.net : we.price) + '</span></div>';
     set("live-we", weHtml);
     var p = document.getElementById("we-pct");
