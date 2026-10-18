@@ -329,11 +329,11 @@ details.why[open] summary::before { content: "▾ "; }
       day: "weekday",
       roundUnit: 100,
       channels: {
-        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply", cleaningFee: 0,
+        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply", cleaningFee: 0, cleanComm: true,
                    promos: [{ name: "조기예약 할인", rate: 5, on: true }] },
-        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply", cleaningFee: 0,
+        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply", cleaningFee: 0, cleanComm: true,
                    promos: [{ name: "베이직 할인", rate: 50, on: true }, { name: "모바일 할인", rate: 10, on: true }, { name: "지니어스 할인", rate: 10, on: true }] },
-        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15.5, processing: 0, weight: 8, stack: "add", cleaningFee: 0,
+        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15, processing: 0, weight: 8, stack: "add", cleaningFee: 0, cleanComm: false,
                    promos: [{ name: "모바일 할인", rate: 10, on: true }, { name: "회원 할인", rate: 15, on: true }] }
       },
       extra: { base: 4, max: 8, airbnbFee: 17219 },
@@ -345,7 +345,8 @@ details.why[open] summary::before { content: "▾ "; }
         { name: "집기 구입비", amount: 0, unit: "year", proof: true, wht: false }
       ],
       nights: { weekday: 16, weekend: 8 },
-      basis: "airbnb"
+      basis: "airbnb",
+      feeModel: 2
     };
   }
 
@@ -366,6 +367,9 @@ details.why[open] summary::before { content: "▾ "; }
           if (Array.isArray(c.promos)) out.channels[k].promos = c.promos;
         }
       });
+      // 트립닷컴 기본 수수료가 15.5%였던 시절 저장값은 15%로 옮긴다
+      if (s.feeModel !== 2 && out.channels.trip.commission === 15.5) out.channels.trip.commission = 15;
+      out.feeModel = 2;
       out.extra = Object.assign(defaults().extra, s.extra || {});
       out.cleaning = Object.assign(defaults().cleaning, s.cleaning || {});
       // 예전 버전(에어비앤비 기준 청소비) 저장값 옮기기
@@ -432,10 +436,11 @@ details.why[open] summary::before { content: "▾ "; }
     return df * (1 - effComm(ch) / 100);
   }
   // 게시가 하나로 게스트 결제가·수수료·순수익 계산
-  function breakdown(ch, price, applyDiscount) {
+  // 청소비: 에어비앤비·부킹닷컴은 청소비에도 수수료가 붙고, 트립닷컴은 객실 요금에만 붙어 청소비는 그대로 들어온다
+  function breakdown(ch, price, applyDiscount, isCleaning) {
     var df = applyDiscount ? discountFactor(ch) : 1;
     var guest = price * df;
-    var fee = guest * effComm(ch) / 100;
+    var fee = isCleaning && ch.cleanComm === false ? 0 : guest * effComm(ch) / 100;
     return { price: price, df: df, guest: guest, fee: fee, net: guest - fee };
   }
 
@@ -529,7 +534,7 @@ details.why[open] summary::before { content: "▾ "; }
     m.room = { guest: m.guest, fee: m.fee, net: m.net };
     var cf = state.channels[key].cleaningFee || 0;
     if (cf > 0) {
-      var c = breakdown(state.channels[key], cf, state.cleaning.applyPromo);
+      var c = breakdown(state.channels[key], cf, state.cleaning.applyPromo, true);
       m.cleaning = { bookings: bookings, per: c, guest: bookings * c.guest, fee: bookings * c.fee, net: bookings * c.net };
       m.guest += m.cleaning.guest; m.fee += m.cleaning.fee; m.net += m.cleaning.net;
     }
@@ -698,7 +703,12 @@ details.why[open] summary::before { content: "▾ "; }
     }
     set("live-main", html);
     var weHtml = state.weekendMode === "pct"
-      ? '<div class="small">주말 1박' + (state.mode === "net" ? " 게시가" : "") + '</div><div class="num" style="font-size:20px;font-weight:700">' + won(we.price) + '</div>'
+      // 평일과 같은 기준으로 보여 준다: 가격부터면 주말 게시가, 순수익부터면 주말 목표 순수익 (작은 글씨로 나머지 하나)
+      ? (state.mode === "net"
+        ? '<div class="small">주말 1박 목표 순수익</div><div class="num" style="font-size:20px;font-weight:700">' + won(state.netInput * (1 + state.weekendPct / 100)) + '</div>' +
+          '<div class="small">에어비앤비 주말 게시가 ' + won(we.price) + '</div>'
+        : '<div class="small">주말 1박 게시가</div><div class="num" style="font-size:20px;font-weight:700">' + won(we.price) + '</div>' +
+          '<div class="small">주말 순수익 ' + won(we.net) + '</div>')
       : '<div class="kv"><span>' + (state.mode === "price" ? "주말 순수익" : "에어비앤비 주말 게시가") + '</span><span class="num" style="font-weight:700">' + won(state.mode === "price" ? we.net : we.price) + '</span></div>';
     set("live-we", weHtml);
     var p = document.getElementById("we-pct");
@@ -746,7 +756,7 @@ details.why[open] summary::before { content: "▾ "; }
         '<div class="line"><span>게시가</span><span style="font-weight:700">' + won(b.price) + '</span></div>' +
         '<div class="line minus"><span>할인 ' + stackLabel(ch) + ' −' + pct((1 - b.df) * 100) + '<br><span class="small">' + promoTxt + '</span></span><span>− ' + won(b.price - b.guest) + '</span></div>' +
         '<div class="line"><span>게스트 결제가</span><span>' + won(b.guest) + '</span></div>' +
-        '<div class="line minus"><span>수수료 ' + pct(effComm(ch)) + (ch.processing ? '<br><span class="small">기본 ' + pct(ch.commission) + ' + 결제대행 ' + pct(ch.processing) + '</span>' : "") + '</span><span>− ' + won(b.fee) + '</span></div>' +
+        '<div class="line minus"><span>수수료 ' + pct(effComm(ch)) + (ch.processing ? '<br><span class="small">기본 ' + pct(ch.commission) + ' + 결제대행 ' + pct(ch.processing) + ' · 청소비에도 붙음</span>' : ch.cleanComm === false ? '<br><span class="small">객실 요금에만 · 청소비에는 안 붙음</span>' : "") + '</span><span>− ' + won(b.fee) + '</span></div>' +
         '<div class="line total"><span>내 순수익</span><span>' + won(b.net) + '</span></div>' +
         '</div>';
     }).join("");
@@ -823,12 +833,12 @@ details.why[open] summary::before { content: "▾ "; }
     var laborWht = state.costs.reduce(function (a, ci) { return a + (ci.unit === "clean" ? costInfo(ci).tax : 0); }, 0);
     var rows = CH_KEYS.map(function (key) {
       var ch = state.channels[key];
-      var b = breakdown(ch, ch.cleaningFee || 0, state.cleaning.applyPromo);
+      var b = breakdown(ch, ch.cleaningFee || 0, state.cleaning.applyPromo, true);
       var left = b.net - labor;
       return '<div class="card mt-s"><div class="flow-head">' + chip(ch, true) + '<span class="grow">' + ch.label + '</span></div>' +
         (ch.cleaningFee > 0
           ? '<div class="line"><span>게스트가 내는 청소비' + (b.df < 1 ? ' <span class="small">(할인 −' + pct((1 - b.df) * 100) + ')</span>' : "") + '</span><span>' + won(b.guest) + '</span></div>' +
-            '<div class="line minus"><span>플랫폼 수수료 ' + pct(effComm(ch)) + '</span><span>− ' + won(b.fee) + '</span></div>' +
+            '<div class="line minus"><span>플랫폼 수수료 ' + (ch.cleanComm === false ? '없음<br><span class="small">수수료는 객실 요금에만 붙어요</span>' : pct(effComm(ch))) + '</span><span>− ' + won(b.fee) + '</span></div>' +
             '<div class="line"><span>내 몫</span><span>' + won(b.net) + '</span></div>'
           : '<div class="line sub"><span>청소비를 받지 않아요</span><span>0원</span></div>') +
         '<div class="line minus"><span>청소 인건비' + (laborWht > 0 ? '<br><span class="small">실지급 ' + won(labor - laborWht) + ' + 원천세 ' + won(laborWht) + '</span>' : "") + '</span><span>− ' + won(labor) + '</span></div>' +
@@ -842,7 +852,7 @@ details.why[open] summary::before { content: "▾ "; }
       '<span class="box-input" style="width:96px"><input id="avg-los2" type="text" inputmode="decimal" data-num="avgLOS" value="' + state.avgLOS + '"><span>박</span></span></div>' +
       '<p class="small" style="margin:10px 0 0">한 달 판매 ' + (n.weekday + n.weekend) + '박 ÷ 평균 ' + state.avgLOS + '박 = <b id="clean-count" style="color:var(--ink)">청소 ' + cleaningsPerMonth() + '회</b> (반올림)</p></div>' +
       '<h2 class="sec">채널별 청소 1회 정산</h2>' + rows +
-      '<p class="note">청소비는 매출에 포함되고, 수수료도 청소비까지 포함한 금액에 붙어요. 청소 인건비는 설정 › 운영 비용의 \'청소 1회\' 항목(지금 원천세 포함 ' + won(labor) + ')이에요. 대부분의 OTA는 할인을 객실 요금에만 적용해서 할인 적용은 기본으로 꺼져 있어요.</p>');
+      '<p class="note">청소비는 매출에 포함돼요. 에어비앤비·부킹닷컴은 청소비에도 수수료(부킹은 결제대행 포함)가 붙고, 트립닷컴은 수수료가 객실 요금에만 붙어 청소비는 그대로 들어와요. 청소 인건비는 설정 › 운영 비용의 \'청소 1회\' 항목(지금 원천세 포함 ' + won(labor) + ')이에요. 대부분의 OTA는 할인을 객실 요금에만 적용해서 할인 적용은 기본으로 꺼져 있어요.</p>');
   }
 
   /* ---------- 상세: 한 달 · 1년 ---------- */
@@ -949,6 +959,7 @@ details.why[open] summary::before { content: "▾ "; }
         '<label class="field">수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':commission" value="' + ch.commission + '"><span>%</span></span></label>' +
         '<label class="field">결제대행 수수료<span class="box-input"><input type="text" inputmode="decimal" data-ch="' + key + ':processing" value="' + ch.processing + '"><span>%</span></span></label>' +
         '<label class="field" style="grid-column:1 / -1">청소비 (예약 1건, 게스트에게 받는 돈)<span class="box-input"><input type="text" inputmode="numeric" data-ch="' + key + ':cleaningFee" value="' + comma(ch.cleaningFee) + '"><span>원</span></span></label>' +
+        '<p class="small" style="grid-column:1 / -1;margin:0">' + (ch.cleanComm === false ? '수수료는 할인 후 객실 요금에만 붙고, 청소비는 수수료 없이 그대로 들어와요. 트립닷컴이 부담하는 쿠폰은 내 정산액에 영향이 없어요.' : key === "booking" ? '수수료와 결제대행 수수료가 할인 후 객실 요금과 청소비를 합한 금액에 붙어요.' : '수수료가 객실 요금과 청소비를 합한 금액에 붙어요.') + '</p>' +
         '</div>' + weight +
         '<p class="promo-title">프로모션 · 할인 ' + stackLabel(ch) + '</p>' + promos +
         '<button type="button" class="add-btn" data-promo-add="' + key + '">+ 프로모션 추가</button></div>';
