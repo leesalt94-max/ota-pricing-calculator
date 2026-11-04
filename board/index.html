@@ -197,23 +197,22 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
     { limit: 300000000, rate: 0.38, deduction: 19940000 }, { limit: 500000000, rate: 0.40, deduction: 25940000 },
     { limit: 1000000000, rate: 0.42, deduction: 35940000 }, { limit: Infinity, rate: 0.45, deduction: 65940000 }
   ];
-  var STORE_KEY = "rate-board-v7";
+  var STORE_KEY = "rate-board-v8";
   var CH_KEYS = ["airbnb", "booking", "trip"];
   var VIEWS = [["promo", "프로모션·수수료"], ["extra", "청소비·인원"], ["stay", "숙박 예시"], ["process", "1박 계산 과정"], ["monthly", "월 수익 내역"], ["tax", "세금 상세"]];
 
   function defaults() {
     return {
       anchor: "airbnb", aWd: 143000, aWe: 190500,       // 마지막으로 가격을 입력한 OTA와 그 가격
-      xAnchor: "airbnb", xFee: 20000,                   // 인원 추가 요금도 마지막으로 입력한 OTA 기준
       basePeople: 4, maxPeople: 8,
       nights: { weekday: 16, weekend: 8 }, avgLOS: 2, roundUnit: 100, cleanPromo: false,
       avgExtra: 0,                                       // 한 달 평균 추가 인원 (1박당)
       channels: {
-        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply", cleaningFee: 50000, cleanComm: true,
+        airbnb:  { label: "에어비앤비", code: "AB", cls: "ab", commission: 15.5, processing: 0, weight: 0, stack: "multiply", cleaningFee: 50000, extraFee: 20000, cleanComm: true,
                    promos: [{ name: "조기예약 할인", rate: 5, on: true }, { name: "막바지 할인", rate: 15, on: false }] },
-        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply", cleaningFee: 50000, cleanComm: true,
+        booking: { label: "부킹닷컴", code: "BK", cls: "bk", commission: 15, processing: 2.5, weight: 5, stack: "multiply", cleaningFee: 50000, extraFee: 20000, cleanComm: true,
                    promos: [{ name: "모바일 할인", rate: 10, on: true }, { name: "지니어스 할인", rate: 10, on: true }, { name: "막바지 할인", rate: 15, on: false }] },
-        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15, processing: 0, weight: 8, stack: "add", cleaningFee: 50000, cleanComm: false,
+        trip:    { label: "트립닷컴", code: "TR", cls: "tr", commission: 15, processing: 0, weight: 8, stack: "add", cleaningFee: 50000, extraFee: 20000, cleanComm: false,
                    promos: [{ name: "모바일 할인", rate: 10, on: true, funder: "host" }, { name: "회원 할인", rate: 15, on: true, funder: "host" }, { name: "막바지 할인", rate: 15, on: false, funder: "host" }, { name: "특별 할인", rate: 9.6, on: false, funder: "ota" }] }
       },
       costs: [
@@ -347,9 +346,8 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
   var last = null;
   function computeAll() {
     var A = state.anchor, ratio = state.aWe / Math.max(1, state.aWd);
-    var xA = state.channels[state.xAnchor], xNet = nightly(xA, +state.xFee).net / wMul(state.xAnchor);
-    var xFees = {};
-    CH_KEYS.forEach(function (k) { xFees[k] = k === state.xAnchor ? +state.xFee : roundTo(xNet * wMul(k) / keepRate(state.channels[k])); });
+    var xFees = {};   // 1인 추가 요금은 OTA마다 따로 입력 (연동하지 않음)
+    CH_KEYS.forEach(function (k) { xFees[k] = +state.channels[k].extraFee || 0; });
     var base = monthly(A, +state.aWd, +state.aWe, xFees[A]);
     var baseCore = base.final / wMul(A);                     // 가중치 0 기준 순수익
     var out = { base: base, baseCore: baseCore, ch: {} };
@@ -446,7 +444,7 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
           // 청소비 · 인원 추가
           '<div class="sec v-extra"><div class="sec-h"><h3>청소비 · 인원 추가</h3></div>' +
           '<div class="f2"><label class="fl" for="' + k + '-cf">청소비 (예약 1건)' + numIn(k + "-cf", 'data-k="channels.' + k + '.cleaningFee"', ch.cleaningFee, "원") + '</label>' +
-          '<label class="fl" for="' + k + '-x">1인 추가 요금 (1박)' + numIn(k + "-x", 'data-xfee="' + k + '"', 0, "원") + '</label></div>' +
+          '<label class="fl" for="' + k + '-x">1인 추가 요금 (1박)' + numIn(k + "-x", 'data-k="channels.' + k + '.extraFee"', ch.extraFee, "원") + '</label></div>' +
           '<label class="chk"><input type="checkbox" id="' + k + '-cc" data-k="channels.' + k + '.cleanComm" data-t="bool"' + (ch.cleanComm ? " checked" : "") + '>청소비에도 수수료 붙음' + (k === "trip" ? ' (트립: 객실 요금에만 수수료 → 기본 해제)' : '') + '</label>' +
           '<div class="calc" id="' + k + '-xcalc"></div></div>' +
           // 숙박 예시
@@ -479,7 +477,7 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
       var r = all.ch[k], ch = r.ch, m = r.m, isA = k === state.anchor;
       document.getElementById("card-" + k).classList.toggle("anchor", isA);
       html(k + "-role", isA ? '<span class="tag solid">기준 · 마지막 입력</span>' : '<span class="tag">순수익 자동 맞춤</span>');
-      setVal(k + "-wd", r.wd); setVal(k + "-we", r.we); setVal(k + "-x", r.xFee);
+      setVal(k + "-wd", r.wd); setVal(k + "-we", r.we);
       if (flashKeys && flashKeys.indexOf(k) >= 0) ["-wd", "-we"].forEach(function (s) { var box = document.getElementById(k + s).parentNode; box.classList.remove("flash"); void box.offsetWidth; box.classList.add("flash"); });
       if (!m) { html(k + "-final", "—"); html(k + "-fsub", "같은 순수익을 낼 가격을 찾지 못했어요"); return; }
       var pe = +state.ex.people, xn = Math.max(0, pe - (+state.basePeople || 0));
@@ -506,7 +504,7 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
       // 청소비 · 인원
       var cl = m.clean;
       html(k + "-xcalc", (cl.price > 0 ? '청소비 게스트 결제 <b>' + won(cl.guest) + '</b> → 내 몫 <b>' + won(cl.net) + '</b>' + (ch.cleanComm ? '' : ' (수수료 없음)') : '청소비 미징수') +
-        '<br>1인 추가 게스트 결제 <b>' + won(r.x.guest) + '</b> → 내 몫 <b>' + won(r.x.net) + '</b>' + (k === state.xAnchor ? ' · 기준' : ' · ' + state.channels[state.xAnchor].label + ' 1인 순수익 × 가중치에 맞춤'));
+        '<br>1인 추가 게스트 결제 <b>' + won(r.x.guest) + '</b> → 내 몫 <b>' + won(r.x.net) + '</b>');
       // 숙박 예시
       var day = state.ex.day, nb = day === "weekday" ? m.wdB : m.weB, extraN = Math.max(0, state.ex.people - (+state.basePeople || 0));
       html(k + "-stayh", '숙박 예시 · ' + (day === "weekday" ? "평일" : "주말") + ' · ' + state.ex.people + '명' + (extraN ? ' (추가 ' + extraN + '명)' : ''));
@@ -601,8 +599,6 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
       el.value = comma(v);
       return;
     }
-    var xf = el.getAttribute && el.getAttribute("data-xfee");
-    if (xf) { state.xAnchor = xf; state.xFee = parseNum(el.value); save(); renderOutputs(); el.value = comma(state.xFee); return; }
     var path = el.getAttribute && el.getAttribute("data-k");
     if (!path) return;
     setPath(path, readVal(el)); save();
