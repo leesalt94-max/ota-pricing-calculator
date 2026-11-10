@@ -132,6 +132,11 @@ label.fl { display: grid; gap: 3px; font-size: 11.5px; color: var(--faint); font
 .tag.plain { background: var(--card); color: var(--sub); border: 1px solid var(--line); }
 .prices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pcol { display: grid; gap: 4px; min-width: 0; }
+.nstep { display: flex; align-items: center; gap: 4px; }
+.nstep .lab { font-size: 11px; color: var(--faint); font-weight: 600; margin-right: auto; white-space: nowrap; }
+.nstep button { border: 1px solid var(--line); background: var(--card); border-radius: 7px; padding: 3px 8px; font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.nstep button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.nstep button:active { background: var(--accent-soft); }
 .pmeta { display: grid; gap: 1px; font-size: 12px; color: var(--sub); }
 .pmeta div { display: flex; justify-content: space-between; gap: 6px; }
 .pmeta b { color: var(--ink); }
@@ -421,8 +426,8 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
         '<div class="c-head">' +
           '<div class="c-name">' + chip(ch) + ch.label + '<span class="tags"><span class="tag plain">할인 ' + (ch.stack === "add" ? "합산" : "곱연산") + '</span><span id="' + k + '-role"></span></span></div>' +
           '<div class="prices">' +
-            '<div class="pcol"><label class="fl" for="' + k + '-wd">평일 게시가' + numIn(k + "-wd", 'data-price="' + k + '.wd"', 0, "원", "price") + '</label><div class="gbig" id="' + k + '-wdm"></div></div>' +
-            '<div class="pcol"><label class="fl" for="' + k + '-we">주말 게시가' + numIn(k + "-we", 'data-price="' + k + '.we"', 0, "원", "price") + '</label><div class="gbig" id="' + k + '-wem"></div></div>' +
+            '<div class="pcol"><label class="fl" for="' + k + '-wd">평일 게시가' + numIn(k + "-wd", 'data-price="' + k + '.wd"', 0, "원", "price") + '</label>' + '<div class="nstep" role="group" aria-label="평일 1박 순수익 조정"><span class="lab">1박 순수익</span><button type="button" data-act="netstep" data-key="' + k + '.wd.-1" aria-label="1박 순수익 1,000원 줄이기">−1,000</button><button type="button" data-act="netstep" data-key="' + k + '.wd.1" aria-label="1박 순수익 1,000원 늘리기">+1,000</button></div>' + '<div class="gbig" id="' + k + '-wdm"></div></div>' +
+            '<div class="pcol"><label class="fl" for="' + k + '-we">주말 게시가' + numIn(k + "-we", 'data-price="' + k + '.we"', 0, "원", "price") + '</label>' + '<div class="nstep" role="group" aria-label="주말 1박 순수익 조정"><span class="lab">1박 순수익</span><button type="button" data-act="netstep" data-key="' + k + '.we.-1" aria-label="1박 순수익 1,000원 줄이기">−1,000</button><button type="button" data-act="netstep" data-key="' + k + '.we.1" aria-label="1박 순수익 1,000원 늘리기">+1,000</button></div>' + '<div class="gbig" id="' + k + '-wem"></div></div>' +
           '</div>' +
           '<div class="final"><span class="k">월 최종 순수익 (세후)</span><span class="v" id="' + k + '-final"></span><div class="side" id="' + k + '-side"></div><span class="sub" id="' + k + '-fsub"></span></div>' +
           '<div class="weight"><label class="fl" for="' + k + '-w" style="flex:none">가중치' + pctIn(k + "-w", "channels." + k + ".weight", ch.weight) + '</label><span class="small" id="' + k + '-wnote"></span></div>' +
@@ -616,6 +621,22 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
     if (act === "view") { state.view[key] = !state.view[key]; b.setAttribute("aria-pressed", state.view[key]); applyViews(); save(); return; }
     if (act === "drawer") { state.drawer = !state.drawer; b.setAttribute("aria-expanded", state.drawer); renderDrawer(); renderOutputs(); save(); return; }
     if (act === "exday") { state.ex.day = key; renderTop(); renderOutputs(); save(); return; }
+    if (act === "netstep") {
+      // 1박 순수익(기준 인원, 수수료·숙소 할인 반영)을 1,000원 단위로 조정 → 그 OTA 게시가를 역산 → 이 카드가 기준이 되고 다른 OTA가 맞춰짐
+      var q = key.split("."), ck = q[0], day = q[1], dir = +q[2], cur = last.ch[ck], ch = state.channels[ck];
+      var price = day === "wd" ? cur.wd : cur.we; if (price == null) return;
+      var kr = keepRate(ch); if (!(kr > 0)) return;
+      // 지금 1박 순수익 ± 1,000원 → 그 순수익에 가장 가까운 게시가 (반올림 단위 때문에 수십 원 오차)
+      var targetNet = Math.max(1000, nightly(ch, price).net + dir * 1000);
+      var np = roundTo(targetNet / kr);
+      if (np === price) np = price + dir * (+state.roundUnit || 100);
+      if (np <= 0) return;
+      state.aWd = day === "wd" ? np : cur.wd;
+      state.aWe = day === "we" ? np : cur.we;
+      state.anchor = ck;
+      save(); renderOutputs(CH_KEYS.filter(function (x) { return x !== ck; }));
+      return;
+    }
     if (act === "people") { state.ex.people = Math.min(+state.maxPeople || 8, Math.max(1, state.ex.people + +key)); renderOutputs(); save(); return; }
     if (act === "addpromo") state.channels[key].promos.push({ name: "새 할인", rate: 5, on: true, funder: "host" });
     else if (act === "delpromo") { var q = key.split("."); state.channels[q[0]].promos.splice(+q[1], 1); }
