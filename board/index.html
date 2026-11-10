@@ -348,7 +348,7 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
   }
   function wMul(key) { return 1 + (+state.channels[key].weight || 0) / 100; }
 
-  var last = null;
+  var last = null, netMemo = {};
   function computeAll() {
     var A = state.anchor, ratio = state.aWe / Math.max(1, state.aWd);
     var xFees = {};   // 1인 추가 요금은 OTA마다 따로 입력 (연동하지 않음)
@@ -627,10 +627,13 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
       var price = day === "wd" ? cur.wd : cur.we; if (price == null) return;
       var kr = keepRate(ch); if (!(kr > 0)) return;
       // 지금 1박 순수익 ± 1,000원 → 그 순수익에 가장 가까운 게시가 (반올림 단위 때문에 수십 원 오차)
-      var targetNet = Math.max(1000, nightly(ch, price).net + dir * 1000);
+      // 연속으로 누를 때는 직전 목표값에서 이어 가서 반올림 오차가 쌓이지 않게 함
+      var memoKey = ck + "." + day, baseNet = (netMemo.key === memoKey && netMemo.price === price) ? netMemo.target : nightly(ch, price).net;
+      var targetNet = Math.max(1000, baseNet + dir * 1000);
       var np = roundTo(targetNet / kr);
       if (np === price) np = price + dir * (+state.roundUnit || 100);
       if (np <= 0) return;
+      netMemo = { key: memoKey, price: np, target: targetNet };
       state.aWd = day === "wd" ? np : cur.wd;
       state.aWe = day === "we" ? np : cur.we;
       state.anchor = ck;
