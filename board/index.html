@@ -97,6 +97,8 @@ label.fl { display: grid; gap: 3px; font-size: 11.5px; color: var(--faint); font
 .gbig .k { font-size: 11.5px; color: var(--faint); font-weight: 600; }
 .gbig .v { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; text-align: right; line-height: 1.2; }
 .gbig .s { font-size: 11px; color: var(--faint); text-align: right; }
+.gbig .nk { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--accent-ink); font-weight: 700; }
+.gbig .nv { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; text-align: right; line-height: 1.2; color: var(--accent-ink); }
 .gbig .xp { margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--line); display: grid; gap: 0; text-align: right; }
 .gbig .xp .xk { font-size: 11.5px; font-weight: 700; color: var(--accent-ink); }
 .gbig .xp .xv { font-size: 17px; font-weight: 800; }
@@ -145,6 +147,10 @@ label.fl { display: grid; gap: 3px; font-size: 11.5px; color: var(--faint); font
 .final .v { font-size: 26px; font-weight: 800; color: var(--accent-ink); letter-spacing: -0.02em; }
 .final .side { grid-row: 1 / span 2; grid-column: 2; display: grid; gap: 4px; justify-items: end; }
 .final .sub { font-size: 11.5px; color: var(--sub); }
+.final .per { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 6px; margin-top: 4px; }
+.final .per .pk { font-size: 12px; font-weight: 700; color: var(--accent-ink); }
+.final .per .pk small { font-weight: 600; color: var(--faint); margin-left: 4px; }
+.final .per .pv { font-size: 20px; font-weight: 800; color: var(--accent-ink); }
 .weight { display: flex; align-items: center; gap: 8px; }
 .weight .inp { width: 92px; background: var(--card); }
 .weight .small { flex: 1; }
@@ -429,7 +435,7 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
             '<div class="pcol"><label class="fl" for="' + k + '-wd">평일 게시가' + numIn(k + "-wd", 'data-price="' + k + '.wd"', 0, "원", "price") + '</label>' + '<div class="nstep" role="group" aria-label="평일 1박 순수익 조정"><span class="lab">1박 순수익</span><button type="button" data-act="netstep" data-key="' + k + '.wd.-1" aria-label="1박 순수익 1,000원 줄이기">−1,000</button><button type="button" data-act="netstep" data-key="' + k + '.wd.1" aria-label="1박 순수익 1,000원 늘리기">+1,000</button></div>' + '<div class="gbig" id="' + k + '-wdm"></div></div>' +
             '<div class="pcol"><label class="fl" for="' + k + '-we">주말 게시가' + numIn(k + "-we", 'data-price="' + k + '.we"', 0, "원", "price") + '</label>' + '<div class="nstep" role="group" aria-label="주말 1박 순수익 조정"><span class="lab">1박 순수익</span><button type="button" data-act="netstep" data-key="' + k + '.we.-1" aria-label="1박 순수익 1,000원 줄이기">−1,000</button><button type="button" data-act="netstep" data-key="' + k + '.we.1" aria-label="1박 순수익 1,000원 늘리기">+1,000</button></div>' + '<div class="gbig" id="' + k + '-wem"></div></div>' +
           '</div>' +
-          '<div class="final"><span class="k">월 최종 순수익 (세후)</span><span class="v" id="' + k + '-final"></span><div class="side" id="' + k + '-side"></div><span class="sub" id="' + k + '-fsub"></span></div>' +
+          '<div class="final"><span class="k">월 최종 순수익 (세후)</span><span class="v" id="' + k + '-final"></span><div class="side" id="' + k + '-side"></div><span class="sub" id="' + k + '-fsub"></span><div class="per" id="' + k + '-per"></div></div>' +
           '<div class="weight"><label class="fl" for="' + k + '-w" style="flex:none">가중치' + pctIn(k + "-w", "channels." + k + ".weight", ch.weight) + '</label><span class="small" id="' + k + '-wnote"></span></div>' +
         '</div>' +
         '<div class="c-body">' +
@@ -487,12 +493,14 @@ body.hide-promo .v-promo, body.hide-extra .v-extra, body.hide-stay .v-stay, body
       if (!m) { html(k + "-final", "—"); html(k + "-fsub", "같은 순수익을 낼 가격을 찾지 못했어요"); return; }
       var pe = +state.ex.people, xn = Math.max(0, pe - (+state.basePeople || 0));
       function gb(B) {
-        return '<span class="k">게스트 결제 · ' + (+state.basePeople) + '명 기준</span><span class="v">' + won(B.guest) + '</span><span class="s">1박 순수익 ' + won(B.net) + '</span>' +
+        return '<span class="k">게스트 결제 · ' + (+state.basePeople) + '명 기준</span><span class="v">' + won(B.guest) + '</span><span class="nk">1박 순수익 · 수수료 뺀 금액</span><span class="nv">' + won(B.net) + '</span>' +
           (xn ? '<span class="xp"><span class="xk">' + pe + '명 (추가 ' + xn + '명)</span><span class="xv">' + won(B.guest + r.x.guest * xn) + '</span><span class="xs">1박 순수익 ' + won(B.net + r.x.net * xn) + '</span></span>' : '');
       }
       html(k + "-wdm", gb(m.wdB));
       html(k + "-wem", gb(m.weB));
       html(k + "-final", won(m.final));
+      var nn = (+state.nights.weekday || 0) + (+state.nights.weekend || 0);
+      html(k + "-per", '<span class="pk">1박당 최종 순수익<small>월 최종 ÷ ' + nn + '박 · 비용·세금 뺀 평균</small></span><span class="pv">' + (nn ? won(m.final / nn) : '—') + '</span>');
       var diff = m.final - all.base.final;
       html(k + "-side", taxPills(m.tax).replace(/<\/span><span/, '</span><span'));
       html(k + "-fsub", isA ? '다른 OTA는 이 금액 × 가중치에 맞춰져요' : '기준보다 ' + signed(diff) + '원' + (all.base.final > 0 ? ' (' + (diff >= 0 ? "+" : "") + pct(diff / all.base.final * 100) + ')' : '') + ' · 가중치 목표 ' + won(r.target));
